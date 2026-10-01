@@ -7,10 +7,10 @@
 
 namespace {
     // System & Timer Configurations
-    constexpr uint32_t F_CPU_HZ		= 16000000UL; // 16 MHz
+    constexpr uint32_t F_CPU_HZ		= F_CPU; 	  // 16 MHz
     constexpr uint16_t PRESCALER	= 8;          // Prescaler divider (1, 8, 64, 256, 1024)
 
-    constexpr uint16_t INTERVAL_US	= 10;         // Desired delay in microseconds
+    constexpr uint16_t INTERVAL_US	= 58;         // Desired delay in microseconds
 
     // Arduino Pin 10 maps to PB2 on ATmega328P
     constexpr uint8_t BITBANG_PIN = PB2;
@@ -27,7 +27,7 @@ namespace {
 }
 
 ISR(TIMER1_COMPA_vect) {
-  // Ultra-fast bit-toggle using PINB register (1 clock cycle / 62.5 ns)
+  // On AVR writing 1 to the input register causes a flip
   PINB = (1 << BITBANG_PIN);
 
   // --- ALTERNATIVE: State-machine bitbanging (e.g., transmitting data) ---
@@ -75,7 +75,6 @@ void bitbang::init() {
 		2. The TIMER1_COMPA_vect interrupt flag fires
 		3. The counting cycle repeats.
 	*/
-
 
 	OCR1A = TIMER_COMPARE_VALUE;
 	
