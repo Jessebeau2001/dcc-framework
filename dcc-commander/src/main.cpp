@@ -26,7 +26,7 @@ void loop() {
     
     // Read count atomically
     cli();
-    uint32_t count = pulse_count;
+    size_t count = pulse_count;
     sei();
 
     // For a 10 us toggle (20 us full wave period), frequency should be ~50,000 Hz
