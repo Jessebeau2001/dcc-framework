@@ -4,6 +4,8 @@
 #include <avr/interrupt.h>
 #include <util/atomic.h>
 
+#include "common/ring_buffer.hpp"
+
 namespace bitbang {
 
 namespace {
@@ -34,29 +36,11 @@ namespace {
 	constexpr uint16_t 	TICK_SCALAR	= compute_tick_scalar(F_CPU_HZ, PRESCALER);
 	static_assert(TICK_SCALAR > 0, "Tick scalar cannot yield 0. The current prescalar to clockspeed configuration is unsuported.");
 
-	// Ring buffer setup - TODO: Do we wrap in in struct with helpers or keep as is?
-	constexpr 	uint8_t TX_BUFFER_SIZE	= 32; // Must be a power of 2
-	constexpr 	uint8_t TX_BUFFER_MASK	= TX_BUFFER_SIZE - 1;
-
-	// Ring buffer state
-	volatile 	uint8_t tx_buf[TX_BUFFER_SIZE];
-	volatile 	uint8_t head 			= 0; // Written by main code
-	volatile 	uint8_t tail 			= 0; // Read by ISR
-
-	// ISR state
+	// ISR state & Ring Buffer
+	RingBuffer<32> tx_buf;
 	volatile 	bool    is_busy      	= false;
-} // namespace
-
-inline size_t available_for_write() {
-	const uint8_t h = head;
-	const uint8_t t = tail;
 	
-	if (h >= t) {
-		return (TX_BUFFER_SIZE - 1) - (h - t);
-	} else {
-		return (t - h) - 1;
-	}
-}
+} // namespace
 
 void init() {
 	cli();							// Disable global interrupts during setup
@@ -74,17 +58,11 @@ void init() {
 }
 
 bool write_frame(const uint8_t* data, size_t length) {
-	if (length == 0 || length > available_for_write()) {
+	if (length == 0 || length > tx_buf.available_for_write()) {
 		return false; 
 	}
 
-	uint8_t current = head;
-	for (size_t i = 0; i < length; i++) {
-		tx_buf[current] = data[i];
-		current = (current + 1) & TX_BUFFER_MASK;
-	}
-	// Updated head pointer once at the end
-	head = current;
+	tx_buf.write(data, length);
 
 	// Restart ISR if idle
 	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
@@ -92,9 +70,7 @@ bool write_frame(const uint8_t* data, size_t length) {
 			is_busy = true;
 
 			// Load initial duration
-			uint8_t initial_us = tx_buf[tail];
-			tail = (tail + 1) & TX_BUFFER_MASK;
-			
+			uint8_t initial_us = tx_buf.pop();
 			OCR1A = compute_ticks(initial_us, TICK_SCALAR);
 
 			TCNT1 = 0;               // Start cleanly from tick 0
@@ -127,11 +103,9 @@ bool write_frame(const uint8_t* data, size_t length) {
 ISR(TIMER1_COMPA_vect) {
 	PINB = (1 << bitbang::BITBANG_PIN);
 
-	// 2. Load the NEXT pulse duration
-    if (bitbang::head != bitbang::tail) {
-        uint8_t next_us = bitbang::tx_buf[bitbang::tail];
-        bitbang::tail = (bitbang::tail + 1) & bitbang::TX_BUFFER_MASK;
-
+	// Load the next duration
+    if (bitbang::tx_buf.head != bitbang::tx_buf.tail) {
+        uint8_t next_us = bitbang::tx_buf.pop();
         // Update target compare match for upcoming pulse
         OCR1A = bitbang::compute_ticks(next_us, bitbang::TICK_SCALAR);
     } else {

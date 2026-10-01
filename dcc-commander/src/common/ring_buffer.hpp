@@ -5,7 +5,8 @@
 
 template <uint8_t Size = 32>
 struct RingBuffer {
-    static_assert((Size & (Size - 1)) == 0, "Buffer size must be a power of 2");
+    static_assert(Size >= 2 && (Size & (Size - 1)) == 0,
+              "Buffer size must be a power of 2 and at least 2");
 
     static constexpr uint8_t SIZE = Size;
     static constexpr uint8_t MASK = Size - 1;
@@ -16,23 +17,29 @@ struct RingBuffer {
     volatile uint8_t tail = 0; // Written by consumer (ISR)
     
     inline size_t available_for_write() {
-        const uint8_t h = head;
-        const uint8_t t = tail;
-        
-        if (h >= t) {
-            return (SIZE - 1) - (h - t);
-        } else {
-            return (t - h) - 1;
-        }
+        return (static_cast<size_t>(tail) -
+                static_cast<size_t>(head) - 1) & MASK;
     }
 
-    // TODO: Maybe change to int, return num bytes written
-    void write(const uint8_t* data, size_t length) {
+    inline void push(uint8_t value) {
+        buf[head] = value;
+        head = (head + 1) & MASK;
+    }
+
+    inline uint8_t pop() {
+        auto value = buf[tail];
+        tail = (tail + 1) & MASK;
+        return value;
+    }
+
+    size_t write(const uint8_t* data, size_t length) {
         uint8_t current = head;
         for (size_t i = 0; i < length; ++i) {
             buf[current] = data[i];
-            current = (current + 1) & MASK;
+            // Beware of integer promotion here
+            current = (current + 1) & MASK; 
         }
         head = current;
+        return length; // Seems stupid - just opening up the contract to posible partial writes later
     }
 };
