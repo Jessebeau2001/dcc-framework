@@ -9,13 +9,9 @@
 namespace bitbang {
 
 namespace {
-	constexpr uint16_t compute_ticks(uint16_t us, uint32_t f_cpu, uint16_t prescaler) {
-		// Formula: Target Ticks - 1
-    	// Target Ticks = (Interval_in_seconds) * (Timer_Clock_Freq)
-    	//              = (us / 1,000,000) * (sys_clk / prescaler)
-    	// Rearranged for integer arithmetic without losing precision:
-        return static_cast<uint16_t>(((f_cpu / 1000000UL) * us) / prescaler) - 1;
-    }
+	// Formula: Target Ticks - 1
+	// Target Ticks = (Interval_in_seconds) * (Timer_Clock_Freq)
+	//              = (us / 1,000,000) * (sys_clk / prescaler)
 
 	// NOTE: Certain configurations yield a scalar of 0, this won't work obviously
 	constexpr uint16_t compute_tick_scalar(uint32_t f_cpu, uint16_t prescaler) {
@@ -110,6 +106,7 @@ ISR(TIMER1_COMPA_vect) {
     if (bitbang::tx_buf.head != bitbang::tx_buf.tail) {
         uint8_t next_us = bitbang::tx_buf.pop();
         // Update target compare match for upcoming pulse
+		// TODO: Move to write_frame - pre calculate and just read+set here
         OCR1A = bitbang::compute_ticks(next_us, bitbang::TICK_SCALAR);
     } else {
         // Frame complete: stop interrupts
