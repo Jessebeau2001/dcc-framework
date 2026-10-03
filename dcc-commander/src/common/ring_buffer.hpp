@@ -3,6 +3,21 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/*  DO NOT USE POINTERS FOR HEAD/TAIL
+    Pointers on AVR are 16-bit, but the architecture is 8-bit.
+    Updating a pointer takes two clock cycles (one for the low byte, one for the high byte).
+    This creates a critical race condition if an interrupt fires in between:
+
+    Original: 0x0000 -> Target: 0x0100
+    1. Main loop writes the low byte (0x00).
+    2. Interrupt fires! It reads the half-updated pointer: High=0x00, Low=0x00 (still looks like 0x0000).
+    
+    Worse case (Targeting 0x0205 from 0x0104):
+    1. Main loop writes new low byte (0x05).
+    2. Interrupt fires! It reads High=0x01 (old), Low=0x05 (new) -> 0x0105 (Corrupted Address!).
+    3. ISR returns, Main loop writes new high byte (0x02) -> Pointer is finally 0x0205.
+*/
+
 template <uint8_t Size = 32>
 struct RingBuffer {
     static_assert(Size >= 2 && (Size & (Size - 1)) == 0,
@@ -16,7 +31,7 @@ struct RingBuffer {
     volatile uint8_t head = 0; // Written by producer (main code)
     volatile uint8_t tail = 0; // Written by consumer (ISR)
     
-    inline size_t available_for_write() {
+    inline size_t available_for_write() const {
         return (static_cast<size_t>(tail) -
                 static_cast<size_t>(head) - 1) & MASK;
     }
