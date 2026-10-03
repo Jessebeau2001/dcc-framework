@@ -82,6 +82,10 @@ bool write_frame(const uint8_t* data, size_t length) {
 	return true;
 }
 
+size_t available_for_write() {
+    return tx_buf.available_for_write();
+}
+
 } // bitbang
 
 /*	What registers do we use:
@@ -102,8 +106,7 @@ bool write_frame(const uint8_t* data, size_t length) {
 
 ISR(TIMER1_COMPA_vect) {
 	PINB = (1 << bitbang::BITBANG_PIN);
-
-	// Load the next duration
+	
     if (bitbang::tx_buf.head != bitbang::tx_buf.tail) {
         uint8_t next_us = bitbang::tx_buf.pop();
         // Update target compare match for upcoming pulse
