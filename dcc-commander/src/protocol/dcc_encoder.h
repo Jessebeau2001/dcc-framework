@@ -6,7 +6,7 @@
     See https://www.nmra.org/sites/default/files/s-92-2004-07.pdf
 */
 
-namespace proto::dcc {
+namespace proto::dcc::legacy {
     // Packet
     union Instruction {
         struct {

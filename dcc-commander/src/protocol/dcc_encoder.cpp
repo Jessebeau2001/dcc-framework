@@ -1,6 +1,6 @@
 #include "dcc_encoder.h"
 
-namespace proto::dcc {
+namespace proto::dcc::legacy {
 
 void encode_frame(const Command &cmd, uint8_t *out) {
     // uint64_t buffer = 0;
