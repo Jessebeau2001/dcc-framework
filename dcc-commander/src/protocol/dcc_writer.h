@@ -52,25 +52,29 @@ namespace proto::dcc {
         Step28     = 0b11111  // 31
     };
 
-    enum class Direction : uint8_t {
-        FORWARD  = 0,
-        BACKWARD = 1
-    };
+    enum class Direction    : uint8_t { FORWARD  = 0, BACKWARD = 1 };
+    enum class Light        : uint8_t { ON  = 0, OFF = 1 };
 
-    union Instruction {
-        struct {
-            uint8_t speed    : 4;   // SSSS (0000 = Stop, 0001 = E-Stop, 0010-1111 = Steps 1-14)
-            uint8_t light    : 1;   // C    (0 = Off, 1 = On)
-            uint8_t direction: 1;   // D    (Direction 0 = Reverse, 1 = Forward)
-            uint8_t idata    : 2;   // 01   (Instruction data)
-        } fields;
+    struct Instruction {
+        uint8_t speed    : 4;   // SSSS (0000 = Stop, 0001 = E-Stop, 0010-1111 = Steps 1-14)
+        uint8_t light    : 1;   // C    (0 = Off, 1 = On)
+        uint8_t direction: 1;   // D    (Direction 0 = Reverse, 1 = Forward)
+        uint8_t idata    : 2;   // 01   (Instruction data)
 
-        uint8_t value;
+        constexpr Instruction(Speed speed, Light light, Direction direction, uint8_t idata = 0b01)
+            : speed(static_cast<uint8_t>(speed)),
+            light(static_cast<uint8_t>(light)),
+            direction(static_cast<uint8_t>(direction)),
+            idata(idata) { }
+
+        constexpr operator uint8_t() const {
+            return *reinterpret_cast<const uint8_t*>(this);
+        }
     };
 
     struct Command {
-        uint8_t     address;        // Address is 8 bits
-        Instruction instruction;
+        uint8_t address;        // Address is a byte
+        uint8_t instruction;    // Single instruction is also always a byte
     };
 
     template<typename Writer>
@@ -93,7 +97,7 @@ namespace proto::dcc {
             Writer::write_byte(byte);
             Writer::write_bit(0);
 
-            checksum ^= byte; // Checsum is exclusive or of every byte send
+            checksum ^= byte; // Checksum is exclusive or of every byte send
         }
 
         void frame_close() {
@@ -112,7 +116,7 @@ namespace proto::dcc {
         void send_command(const Command &command) {
             frame_writer.frame_open();
             frame_writer.write_byte(command.address);
-            frame_writer.write_byte(command.instruction.value);
+            frame_writer.write_byte(static_cast<uint8_t>(command.instruction));
             frame_writer.frame_close();
         }
     };
@@ -136,7 +140,7 @@ namespace proto::dcc {
         // uint64_t buffer = 0;
         // uint8_t *out = reinterpret_cast<uint8_t*>(&buffer);
 
-        auto instruction = cmd.instruction.value;
+        auto instruction = static_cast<uint8_t>(cmd.instruction);
         uint8_t checksum = 0; // Should be bitwise xor on all bytes
 
         // Byte 0 & 1 [11111111 11111111]: 16-bit preamble
