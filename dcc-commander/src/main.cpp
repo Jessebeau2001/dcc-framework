@@ -2,6 +2,7 @@
 #include "HAL/bitbang.h"
 
 #include "protocol/dcc_writer.h"
+#include "common/bit_ring_buffer.hpp"
 
 inline void print_timing(uint8_t t) {
 	// Serial.print(t);
@@ -24,6 +25,8 @@ void setup() {
     // while (!Serial.available()) { }
 
 	auto controller = DccController<DccWriter<TimingAdapter<58, 100, print_timing>>>();
+
+	BitRingBuffer buf{};
 
 	Command cmd1 = {
 		.address = 0b11001100,
