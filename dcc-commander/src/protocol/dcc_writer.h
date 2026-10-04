@@ -19,7 +19,7 @@ namespace proto::dcc {
         Instruction instruction;
     };
 
-    template<auto WriteByte, auto WriteBit>
+    template<typename Writer>
     class DccWriter {
     private:
         uint8_t checksum = 0;
@@ -30,21 +30,21 @@ namespace proto::dcc {
         void frame_open() {
             checksum = 0;
 
-            WriteByte(0xFF); // Write the preamble
-            WriteByte(0xFF); // We choose 16 preamble bits instead of 11
-            WriteBit(0);
+            Writer::write_byte(0xFF); // Write the preamble
+            Writer::write_byte(0xFF); // We choose 16 preamble bits instead of 11
+            Writer::write_bit(0);
         }
 
         void write_byte(uint8_t byte) {
-            WriteByte(byte);
-            WriteBit(0);
+            Writer::write_byte(byte);
+            Writer::write_bit(0);
 
             checksum ^= byte; // Checsum is exclusive or of every byte send
         }
 
         void frame_close() {
-            WriteByte(checksum);
-            WriteBit(1);
+            Writer::write_byte(checksum);
+            Writer::write_bit(1);
         }
     };
 
@@ -52,7 +52,7 @@ namespace proto::dcc {
     template <typename Writer>
     class DccController {
     private:
-        DccWriter<Writer::write_byte, Writer::write_bit> frame_writer;
+        Writer frame_writer;
 
     public:
         void send_command(const Command &command) {
