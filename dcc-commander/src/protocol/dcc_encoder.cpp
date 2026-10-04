@@ -2,9 +2,9 @@
 
 namespace proto::dcc {
 
-void encode_command(const Command &cmd, uint8_t *buffer) {
-    uint64_t buf = 0;
-    uint8_t *out = (uint8_t *)&buf;
+void encode_frame(const Command &cmd, uint8_t *out) {
+    // uint64_t buffer = 0;
+    // uint8_t *out = reinterpret_cast<uint8_t*>(&buffer);
 
     auto instruction = cmd.instruction.value;
 
