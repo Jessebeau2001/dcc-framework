@@ -50,14 +50,18 @@ struct BitRingBuffer {
             uint8_t free_bits = head.free_bits();
             uint8_t next_byte = head.next_byte();
 
-            buffer[head.byte] |= (byte << head.bit); // Write lower
-            buffer[next_byte] = (byte >> free_bits); // Write upper
+            // buffer[head.byte] |= (byte << head.bit);     // Write lower
+            // buffer[next_byte]  = (byte >> free_bits);    // Write upper
+
+            buffer[head.byte] |= (byte >> (8 - free_bits)); // Write upper
+            buffer[next_byte]  = (byte << free_bits);       // Write lower
 
             head.step_byte();
         }
     }
 
     void push_bit(bool bit) { 
+        // When currently aligned clear out entire value
         if (head.bit == 0) {
             buffer[head.byte] = 0;
         }
@@ -74,6 +78,16 @@ struct BitRingBuffer {
     }
 
     inline uint8_t pop_byte() {
-        
+        return 0;
+    }
+
+    inline bool pop_bit() {
+        // Read the current bit from MSB to LSB
+        uint8_t bit_index = 7 - tail.bit;
+        bool bit = (buffer[tail.byte] >> bit_index) & 1;
+
+        tail.step_bit();
+
+        return bit;
     }
 };

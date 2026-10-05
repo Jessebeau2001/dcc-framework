@@ -5,8 +5,8 @@
 #include "common/bit_ring_buffer.hpp"
 
 inline void print_timing(uint8_t t) {
-	// Serial.print(t);
-	// Serial.print(" ");
+	Serial.print(t);
+	Serial.print(" ");
 }
 
 using proto::dcc::TimingAdapter;
@@ -18,31 +18,27 @@ using proto::dcc::Speed;
 using proto::dcc::Light;
 using proto::dcc::Direction;
 
+auto controller = DccController<DccWriter<TimingAdapter<58, 100, bitbang::write_byte>>>();
+
+Command cmd1 = {
+	.address = 0b11001100,
+	.instruction = Instruction{
+		Speed::Step5,
+		Light::ON,
+		Direction::FORWARD,
+		0b01
+	}
+};
+
 void setup() {
     // bitbang::init();
 
-    // Serial.begin(9600);
-    // while (!Serial.available()) { }
-
-	auto controller = DccController<DccWriter<TimingAdapter<58, 100, print_timing>>>();
-
-	BitRingBuffer buf{};
-
-	Command cmd1 = {
-		.address = 0b11001100,
-		.instruction = Instruction{
-			Speed::Step5,
-			Light::ON,
-			Direction::FORWARD,
-			0b01
-		}
-	};
-	
-	controller.send_command(cmd1);
+	pinMode(PIN6, OUTPUT);
+	analogWrite(PIN6, 127);
 }
 
 void loop() {
-    // if (bitbang::available_for_write() > 8) {
-    //     bitbang::write_frame(FRAME, 2);
+	// if (bitbang::available_for_write() > 40) {
+	// 	controller.send_command(cmd1);
     // }
 }

@@ -33,7 +33,7 @@ namespace {
 	static_assert(TICK_SCALAR > 0, "Tick scalar cannot yield 0. The current prescalar to clockspeed configuration is unsuported.");
 
 	// ISR state & Ring Buffer
-	RingBuffer<32> tx_buf;
+	RingBuffer<128> tx_buf;
 	volatile 	bool    is_busy      	= false;
 	
 } // namespace
