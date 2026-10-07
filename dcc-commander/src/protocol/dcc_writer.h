@@ -77,47 +77,48 @@ namespace proto::dcc {
         uint8_t instruction;    // Single instruction is also always a byte
     };
 
-    template<typename Writer>
-    class DccWriter {
+    // TODO: Rename to serializer
+    template<typename Serializer>
+    class DccSerializer {
     private:
         uint8_t checksum = 0;
 
     public:
-        DccWriter() { }
+        DccSerializer() { }
 
         void frame_open() {
             checksum = 0;
 
-            Writer::write_byte(0xFF); // Write the preamble
-            Writer::write_byte(0xFF); // We choose 16 preamble bits instead of 11
-            Writer::write_bit(0);
+            Serializer::write_byte(0xFF); // Write the preamble
+            Serializer::write_byte(0xFF); // We choose 16 preamble bits instead of 11
+            Serializer::write_bit(0);
         }
 
         void write_byte(uint8_t byte) {
-            Writer::write_byte(byte);
-            Writer::write_bit(0);
+            Serializer::write_byte(byte);
+            Serializer::write_bit(0);
 
             checksum ^= byte; // Checksum is exclusive or of every byte send
         }
 
         void frame_close() {
-            Writer::write_byte(checksum);
-            Writer::write_bit(1);
+            Serializer::write_byte(checksum);
+            Serializer::write_bit(1);
         }
     };
 
 
-    template <typename Writer>
+    template <typename Serializer>
     class DccController {
     private:
-        Writer frame_writer;
+        Serializer serializer;
 
     public:
         void send_command(const Command &command) {
-            frame_writer.frame_open();
-            frame_writer.write_byte(command.address);
-            frame_writer.write_byte(static_cast<uint8_t>(command.instruction));
-            frame_writer.frame_close();
+            serializer.frame_open();
+            serializer.write_byte(command.address);
+            serializer.write_byte(static_cast<uint8_t>(command.instruction));
+            serializer.frame_close();
         }
     };
 
@@ -133,6 +134,20 @@ namespace proto::dcc {
             auto timing = bit ? TimingHigh : TimingLow;
             Writer(timing);
             Writer(timing);
+        }
+    };
+
+    
+    struct SerialWriter {
+        static inline void write_byte(uint8_t byte) {
+            for (size_t i = 0; i < 8; i++) {
+            auto isFlipped = ((byte << i) & 0b10000000) != 0;
+            write_bit(isFlipped);
+            }
+        }
+
+        static inline void write_bit(bool bit) {
+            Serial.print(bit ? '1' : '0');
         }
     };
 
@@ -152,7 +167,7 @@ namespace proto::dcc {
 
         // Byte 3 [A0IIIIII]: address bit 7 + Data start bit + Instruction lower 6 bits
         out[3] = (cmd.address & 0b10000000) | (instruction & 0b00111111);
-
+ 
         // Byte 4 [II0EEEEE]: instruction upper 2 bits + data Start bit + ERC lower 5 bits
         out[4] = (instruction & 0b11000000) | (checksum & 0b00011111);
 
