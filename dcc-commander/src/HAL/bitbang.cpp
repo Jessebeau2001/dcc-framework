@@ -34,14 +34,16 @@ namespace {
 
 	// ISR state & Ring Buffer
 	RingBuffer<128> tx_buf;
-	volatile 	bool    is_busy      	= false;
+	volatile 	bool    is_busy      = false;
 	
 } // namespace
 
 void init() {
 	cli();							// Disable global interrupts during setup
 
-	DDRB |= (1 << BITBANG_PIN);		// Set BITBANG_PIN as output
+	DDRB |= (1 << PB2); // Set BITBANG_PIN as output
+	DDRB |= (1 << PB3);
+	PINB  = (1 << PB3); // FLIP INITIAL STATE
 
 	TCCR1A = 0;						// Reset Timer 1 Registers
 	TCCR1B = 0;
@@ -101,7 +103,8 @@ size_t available_for_write() {
 */
 
 ISR(TIMER1_COMPA_vect) {
-	PINB = (1 << bitbang::BITBANG_PIN);
+	PINB = (1 << PB2);
+	PINB = (1 << PB3);
 	
     if (bitbang::tx_buf.head != bitbang::tx_buf.tail) {
         uint8_t next_us = bitbang::tx_buf.pop();
