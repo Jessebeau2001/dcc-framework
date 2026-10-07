@@ -41,7 +41,11 @@ struct BitRingBuffer {
     Marker head{}; // Mutated by producer
     Marker tail{}; // Mutated by consumer
 
-    void push(uint8_t byte) {
+    inline bool available_for_read() const {
+        return tail.byte != head.byte;
+    }
+
+    void push_byte(uint8_t byte) {
         if (head.bit == 0) {
             buffer[head.byte] = byte;
             head.step_byte();
@@ -67,27 +71,30 @@ struct BitRingBuffer {
         }
 
         if (bit) {
-            buffer[head.byte] |= (1 << head.bit);
+            buffer[head.byte] |= (1 << (7 - head.bit));
         }
 
         head.step_bit();
     }
 
-    inline bool available_for_read() const {
-        return tail.byte != head.byte;
-    }
-
     inline uint8_t pop_byte() {
-        return 0;
+        uint8_t value;
+        if (tail.bit == 0) {
+            value = buffer[tail.byte];
+            tail.step_byte();
+        } else {
+            uint8_t upper = buffer[tail.byte] << tail.bit; 
+            tail.step_byte();
+            uint8_t lower = buffer[tail.byte] >> (8 - tail.bit);
+
+            value = upper | lower;
+        }
+        return value;
     }
 
     inline bool pop_bit() {
-        // Read the current bit from MSB to LSB
-        uint8_t bit_index = 7 - tail.bit;
-        bool bit = (buffer[tail.byte] >> bit_index) & 1;
-
+        bool bit = (buffer[tail.byte] >> (7 - tail.bit)) & 1;
         tail.step_bit();
-
         return bit;
     }
 };
