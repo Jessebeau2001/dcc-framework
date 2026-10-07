@@ -41,7 +41,7 @@ struct BitRingBuffer {
     Marker head{}; // Mutated by producer
     Marker tail{}; // Mutated by consumer
 
-    inline bool available_for_read() const {
+    inline bool read_available() const {
         return tail.byte != head.byte;
     }
 

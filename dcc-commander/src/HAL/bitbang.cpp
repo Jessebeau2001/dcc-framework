@@ -5,6 +5,7 @@
 #include <util/atomic.h>
 
 #include "common/ring_buffer.hpp"
+#include "common/bit_ring_buffer.hpp"
 
 namespace bitbang {
 
@@ -24,26 +25,42 @@ namespace {
 		return (us * tick_scalar) - 1;
 	}
 
+	inline bool timer_is_busy() {
+    	return (TIMSK1 & (1 << OCIE1A)) != 0;
+	}
+
+	inline void timer_stop() {
+		TIMSK1 &= ~(1 << OCIE1A);
+	}
+
     // System & Timer Configurations
     constexpr uint32_t 	F_CPU_HZ	= F_CPU;	// Chip speed
     constexpr uint16_t 	PRESCALER	= 8;		// Prescaler divider (1, 8, 64, 256, 1024)
     constexpr uint8_t 	BITBANG_PIN = PB2;		// Arduino Pin 10 maps to PB2 on ATmega328P
+	constexpr uint8_t	BIT_HIGH_US = 58;		// Bit high time in microseconds
+	constexpr uint8_t	BIT_LOW_US  = 100;		// Bit low time in microseconds
 
 	constexpr uint16_t 	TICK_SCALAR	= compute_tick_scalar(F_CPU_HZ, PRESCALER);
 	static_assert(TICK_SCALAR > 0, "Tick scalar cannot yield 0. The current prescalar to clockspeed configuration is unsuported.");
 
+	constexpr uint8_t BIT_HIGH_TICKS = compute_ticks(BIT_HIGH_US, TICK_SCALAR);
+	constexpr uint8_t BIT_LOW_TICKS  = compute_ticks(BIT_LOW_US, TICK_SCALAR);
+
 	// ISR state & Ring Buffer
-	RingBuffer<128> tx_buf;
+	RingBuffer<128> 	tx_buf;
 	volatile 	bool    is_busy      = false;
+	
+	BitRingBuffer<128> 	tx_buf_;
+	
 	
 } // namespace
 
 void init() {
 	cli();							// Disable global interrupts during setup
 
-	DDRB |= (1 << PB2); // Set BITBANG_PIN as output
+	DDRB |= (1 << PB2); 			// Set BITBANG_PIN as output
 	DDRB |= (1 << PB3);
-	PINB  = (1 << PB3); // FLIP INITIAL STATE
+	PINB  = (1 << PB3); 			// Flip PB3 opposed to PB2
 
 	TCCR1A = 0;						// Reset Timer 1 Registers
 	TCCR1B = 0;
@@ -55,20 +72,10 @@ void init() {
 	sei(); 							// Enable global interrupts
 }
 
-bool write_frame(const uint8_t* data, size_t length) {
-	if (length == 0 || length > tx_buf.available_for_write()) {
-		return false; 
-	}
-
-	tx_buf.write(data, length);
-
-	// Restart ISR if idle
-	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-		if (!is_busy) {
-			is_busy = true;
-
-			// Load initial duration
-			uint8_t initial_us = tx_buf.pop();
+inline void kickstart_ISR() {
+	if (!timer_is_busy()) {
+		ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+			uint8_t initial_us = tx_buf.pop(); 
 			OCR1A = compute_ticks(initial_us, TICK_SCALAR);
 
 			TCNT1 = 0;               // Start cleanly from tick 0
@@ -76,12 +83,41 @@ bool write_frame(const uint8_t* data, size_t length) {
 			TIMSK1 |= (1 << OCIE1A); // Enable interrupt
 		}
 	}
+}
 
+inline void kickstart_ISR__() {
+	if (!timer_is_busy()) {
+		ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+			uint8_t initial_us = tx_buf.pop(); 
+			OCR1A = compute_ticks(initial_us, TICK_SCALAR);
+
+			TCNT1 = 0;               // Start cleanly from tick 0
+			TIFR1 = (1 << OCF1A);    // Clear stale interrupt flags
+			TIMSK1 |= (1 << OCIE1A); // Enable interrupt
+		}
+	}
+}
+
+bool write_frame(const uint8_t* data, size_t length) {
+	if (length == 0 || length > tx_buf.available_for_write()) {
+		return false; 
+	}
+
+	tx_buf.write(data, length);
+	kickstart_ISR();
 	return true;
 }
 
 size_t available_for_write() {
     return tx_buf.available_for_write();
+}
+
+inline void Writer::write_byte(uint8_t byte) {
+	tx_buf_.push_byte(byte);
+}
+
+inline void Writer::write_bit(bool bit) {
+	tx_buf_.push_bit(bit);
 }
 
 } // bitbang
@@ -112,8 +148,30 @@ ISR(TIMER1_COMPA_vect) {
 		// TODO: Move to write_frame - pre calculate and just read+set here
         OCR1A = bitbang::compute_ticks(next_us, bitbang::TICK_SCALAR);
     } else {
-        // Frame complete: stop interrupts
-        TIMSK1 &= ~(1 << OCIE1A);
-        bitbang::is_busy = false;
+        bitbang::timer_stop();		// Buffer exthausted, stop interrupts
     }
+}
+
+bool was_risen = false;
+uint8_t current_byte = 0;
+uint8_t current_bit = 0;
+
+ISR(TIMER1_COMPA_vect) {
+	PINB = (1 << PB2) | (1 << PB3);		// Always flip the pins
+
+	was_risen = !was_risen;
+		
+	if (was_risen && current_bit >= 8) {// Falling edge, prepare next timing
+		if (bitbang::tx_buf_.read_available()) {
+			current_byte = bitbang::tx_buf_.pop_byte();
+			current_bit = 0;
+
+			bool is_bit_set = ((current_byte << current_bit) & 0b10000000) != 0;
+			OCR1A = is_bit_set ? bitbang::BIT_HIGH_TICKS : bitbang::BIT_LOW_TICKS;
+
+			current_bit++;
+		} else {
+			bitbang::timer_stop(); 		// Buffer exhausted, stop interrupts
+		}
+	}
 }

@@ -11,4 +11,9 @@ namespace bitbang {
     inline bool write_byte(uint8_t byte) {
         return write_frame(&byte, 1);
     }
+
+    struct Writer {
+        static inline void write_byte(uint8_t byte);
+        static inline void write_bit(bool bit);
+    };
 }

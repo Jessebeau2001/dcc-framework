@@ -10,15 +10,18 @@ inline void print_timing(uint8_t t) {
 }
 
 using proto::dcc::TimingAdapter;
-using proto::dcc::DccWriter;
+using proto::dcc::DccSerializer;
 using proto::dcc::DccController;
 using proto::dcc::Command;
 using proto::dcc::Instruction;
 using proto::dcc::Speed;
 using proto::dcc::Light;
 using proto::dcc::Direction;
+using proto::dcc::SerialWriter;
 
-auto controller = DccController<DccWriter<TimingAdapter<58, 100, bitbang::write_byte>>>();
+
+// auto controller = DccController<DccSerializer<TimingAdapter<58, 100, bitbang::write_byte>>>();
+auto controller = DccController<DccSerializer<SerialWriter>>();
 
 Command cmd1 = {
 	.address = 0b11001100,
@@ -33,8 +36,10 @@ Command cmd1 = {
 void setup() {
     // bitbang::init();
 
-	pinMode(PIN6, OUTPUT);
-	analogWrite(PIN6, 127);
+	Serial.begin(9600);
+	while (!Serial.available()) { }
+
+	controller.send_command(cmd1);
 }
 
 void loop() {

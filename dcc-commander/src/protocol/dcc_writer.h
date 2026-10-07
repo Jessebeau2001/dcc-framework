@@ -77,7 +77,6 @@ namespace proto::dcc {
         uint8_t instruction;    // Single instruction is also always a byte
     };
 
-    // TODO: Rename to serializer
     template<typename Serializer>
     class DccSerializer {
     private:
@@ -141,8 +140,8 @@ namespace proto::dcc {
     struct SerialWriter {
         static inline void write_byte(uint8_t byte) {
             for (size_t i = 0; i < 8; i++) {
-            auto isFlipped = ((byte << i) & 0b10000000) != 0;
-            write_bit(isFlipped);
+                auto isFlipped = ((byte << i) & 0b10000000) != 0;
+                write_bit(isFlipped);
             }
         }
 
