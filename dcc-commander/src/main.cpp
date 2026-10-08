@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include "HAL/bitbang.h"
+#include "HAL/bitbang.hpp"
 
 #include "protocol/dcc_writer.h"
 #include "common/bit_ring_buffer.hpp"
@@ -20,8 +20,7 @@ using proto::dcc::Direction;
 using proto::dcc::SerialWriter;
 
 
-// auto controller = DccController<DccSerializer<TimingAdapter<58, 100, bitbang::write_byte>>>();
-auto controller = DccController<DccSerializer<SerialWriter>>();
+auto controller = DccController<DccSerializer<bitbang::Writer>>();
 
 Command cmd1 = {
 	.address = 0b11001100,
@@ -35,9 +34,8 @@ Command cmd1 = {
 
 void setup() {
     // bitbang::init();
-
-	Serial.begin(9600);
-	while (!Serial.available()) { }
+	// Serial.begin(9600);
+	// while (!Serial.available()) { }
 
 	controller.send_command(cmd1);
 }
