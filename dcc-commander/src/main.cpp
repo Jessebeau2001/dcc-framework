@@ -1,13 +1,7 @@
 #include <Arduino.h>
 #include "HAL/bitbang.hpp"
 
-#include "protocol/dcc_writer.h"
-#include "common/bit_ring_buffer.hpp"
-
-inline void print_timing(uint8_t t) {
-	Serial.print(t);
-	Serial.print(" ");
-}
+#include "protocol/dcc.hpp"
 
 using proto::dcc::TimingAdapter;
 using proto::dcc::DccSerializer;
