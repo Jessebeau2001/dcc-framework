@@ -13,8 +13,8 @@ struct BitRingBuffer {
     static constexpr uint8_t MASK = Size - 1;
 
     struct Marker {
-        uint8_t bit = 0;
-        uint8_t byte = 0;
+        volatile uint8_t bit = 0;
+        volatile uint8_t byte = 0;
 
         inline uint8_t next_byte() {
             return (byte + 1) & MASK;
@@ -42,12 +42,16 @@ struct BitRingBuffer {
     Marker tail{}; // Mutated by consumer
 
     inline size_t available_for_write() const {
-        return (static_cast<size_t>(tail.byte) -
-                static_cast<size_t>(head.byte) - 1) & MASK;
+        // Calculate free whole-byte slots in the ring.
+        // Reserve one slot to distinguish a full buffer from an empty one.
+        // MASK wraps the distance around the power-of-two buffer.
+        return (static_cast<size_t>(tail.byte) + SIZE - head.byte - 1) & MASK;
     }
 
     inline bool available_for_read() const {
-        return tail.byte != head.byte;
+        if (tail.byte != head.byte) return true;
+        if (tail.bit != head.bit) return true;
+        return false;
     }
 
     void push_byte(uint8_t byte) {
