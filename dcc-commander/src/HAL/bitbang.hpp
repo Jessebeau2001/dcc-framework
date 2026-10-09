@@ -51,9 +51,9 @@ volatile uint8_t 	current_byte	= 0;
 volatile uint8_t 	current_bit		= 0;
 volatile bool 		was_risen 		= false;
 
-inline uint8_t compute_current_ticks() {
+inline uint8_t get_current_tick() {
     bool is_bit_set = (current_byte & (1 << (7 - current_bit))) != 0;
-    return compute_ticks(is_bit_set ? BIT_HIGH_TICKS : BIT_LOW_TICKS, TICK_SCALAR);
+    return is_bit_set ? BIT_HIGH_TICKS : BIT_LOW_TICKS;
 }
 
 inline void kickstart_ISR() {
@@ -65,7 +65,7 @@ inline void kickstart_ISR() {
 			was_risen = false;
 
 			// Configure initial timing
-			OCR1A = compute_current_ticks();
+			OCR1A = get_current_tick();
 
 			TCNT1 = 0;               // Start cleanly from tick 0
 			TIFR1 = (1 << OCF1A);    // Clear stale interrupt flags
@@ -78,6 +78,12 @@ inline void kickstart_ISR() {
 
 namespace bitbang {
 using namespace detail;
+
+void PREFILL_FOR_TEST() {
+	for (size_t i = 0; i < 120; i++) {
+		tx_buf.push_byte(0);
+	}
+}
 
 void init() {
     cli();							// Disable global interrupts during setup
@@ -159,7 +165,7 @@ ISR(TIMER1_COMPA_vect) {
 				return;					// Early exit
 			}
 		}
-		OCR1A = compute_current_ticks();
+		OCR1A = get_current_tick();
 	}
 }
 
