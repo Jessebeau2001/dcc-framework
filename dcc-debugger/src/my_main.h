@@ -162,6 +162,13 @@ void append_bit_for_print(uint8_t bit) {
     }
 }
 
+void print_bin(char *buf, uint8_t value) {
+    for (int i = 7; i >= 0; i--) {
+        buf[7 - i] = (value & (1U << i)) ? '1' : '0';
+    }
+    buf[8] = '\0';
+}
+
 static void process_pulse(uint32_t pulse_us)
 {
     uint8_t decoded_bit;
@@ -203,21 +210,26 @@ static void process_pulse(uint32_t pulse_us)
     if (dcc_decoder.state == COMPLETE) {
         dcc_decoder.state = PREAMBLE;
 
-        const expected_crc = dcc_decoder.address ^ dcc_decoder.instruction;
         char msg[128];
+        char instruction[9];
+        char crc[9];
+        const uint8_t expected_crc = dcc_decoder.address ^ dcc_decoder.instruction;
+
+        print_bin(instruction, dcc_decoder.instruction);
+        print_bin(crc, dcc_decoder.crc);
 
         int len = snprintf(
             msg,
             sizeof(msg),
             "Decoded a packet!\r\n"
             "  Addr: %u\r\n"
-            "  Inst: %u\r\n"
-            "  CRC: %u\r\n"
+            "  Inst: 0b%s\r\n"
+            "  CRC: 0b%s\r\n"
             "  Validity: %s\r\n\r\n",
             (unsigned)dcc_decoder.address,
-            (unsigned)dcc_decoder.instruction,
-            (unsigned)dcc_decoder.crc,
-            dcc_decoder.crc == expected_crc ? "VALID" : "INVALID"
+            instruction,
+            crc,
+            (dcc_decoder.crc == expected_crc) ? "VALID" : "INVALID"
         );
 
         HAL_UART_Transmit(
