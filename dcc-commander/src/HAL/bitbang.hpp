@@ -171,6 +171,7 @@ ISR(TIMER1_COMPA_vect) {
         break;
 
     case TxState::EXIT:
+        flip_tx_pins();
         timer_stop();
         break;
     }
