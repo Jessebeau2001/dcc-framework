@@ -9,19 +9,16 @@
 #include "common/bit_ring_buffer.hpp"
 
 namespace bitbang::detail {
-// Formula: Target Ticks - 1
-// Target Ticks = (Interval_in_seconds) * (Timer_Clock_Freq)
-//              = (us / 1,000,000)      * (sys_clk / prescaler)
+/*  In hardware CTC mode (WGM12), Timer1 counts from 0 up to N.
+    That yields N + 1 timer clock cycles in a full period hence the -1.
 
-// NOTE: Certain configurations yield a scalar of 0, this won't work obviously
-constexpr uint16_t compute_tick_scalar(uint32_t f_cpu, uint16_t prescaler) {
-    return static_cast<uint16_t>(f_cpu / (1000000UL * prescaler));
-}
-
-constexpr uint16_t compute_ticks(uint16_t us, uint16_t tick_scalar) {
-    // In hardware CTC mode (WGM12), Timer1 counts from 0 up to N.
-    // That yields N + 1 timer clock cycles in a full period hence the -1.
-    return (us * tick_scalar) - 1;
+    Formula:
+        Target Ticks = (Interval_in_seconds) * (Timer_Clock_Freq) - 1
+        Target Ticks = (us / 1,000,000)      * (sys_clk / prescaler) - 1
+*/
+constexpr uint16_t compute_ticks(uint32_t f_cpu, uint16_t prescaler, uint16_t us) {
+    // Formula: (us * f_cpu) / (1000000UL * prescaler) - 1
+    return static_cast<uint16_t>((static_cast<uint64_t>(us) * f_cpu) / (1000000UL * prescaler) - 1);
 }
 
 enum class TxState : uint8_t {
@@ -31,17 +28,13 @@ enum class TxState : uint8_t {
 };
 
 // System & Timer Configurations
-constexpr uint32_t 	F_CPU_HZ		= F_CPU;	// Chip speed
 constexpr uint16_t 	PRESCALER		= 8;		// Prescaler divider (1, 8, 64, 256, 1024)
 constexpr uint8_t	BIT_HIGH_US 	= 58;		// Bit high time in microseconds
 constexpr uint8_t	BIT_LOW_US  	= 100;		// Bit low time in microseconds
 
-constexpr uint16_t 	TICK_SCALAR		= compute_tick_scalar(F_CPU_HZ, PRESCALER);
-static_assert(TICK_SCALAR > 0, "Tick scalar cannot yield 0. The current prescalar to clockspeed configuration is unsuported.");
-
 // Computed timing constants
-constexpr uint8_t 	BIT_HIGH_TICKS	= compute_ticks(BIT_HIGH_US, TICK_SCALAR);
-constexpr uint8_t 	BIT_LOW_TICKS	= compute_ticks(BIT_LOW_US, TICK_SCALAR);
+constexpr uint8_t 	BIT_HIGH_TICKS	= compute_ticks(F_CPU, PRESCALER, BIT_HIGH_US);
+constexpr uint8_t 	BIT_LOW_TICKS	= compute_ticks(F_CPU, PRESCALER, BIT_LOW_US);
 
 // ISR state & Ring Buffer
 BitRingBuffer<128> 	tx_buf;
@@ -69,15 +62,13 @@ inline void flip_tx_pins() {
 inline void kickstart_ISR() {
 	if (!timer_is_busy()) {
 		ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-			// Load byte and reset state
+			// Load first byte and reset state
 			current_byte    = tx_buf.pop_byte();
 			current_bit     = 0;
-			tx_state        = TxState::RISE;
-
-			// Set initial timing
-			timer_set_compare();
+            tx_state        = TxState::RISE;
 
 			TCNT1 = 0;               // Start cleanly from tick 0
+            timer_set_compare();
 			TIFR1 = (1 << OCF1A);    // Clear stale interrupt flags
 			TIMSK1 |= (1 << OCIE1A); // Enable interrupt
 		}
@@ -147,55 +138,40 @@ struct Writer {
 	3. The counting cycle repeats.
 */
 
-// entry somewhere else in the program:
-// Configures first byte
-// Resets bit index to 0
-// Resets was_risen to false
-// Preloads first timing
+/* for the byte 0 this should flip 16 times. it should stay down for 100us and then stay up for 100us to make a zero bit
+    (whether it starts up or down doesnt matter, it just needs to flip and hold twice per bit)
 
-// This results in the first two ISR triggers:
-// 1. Rise
-// 2. Lower then load next bit
+*/
 
 ISR(TIMER1_COMPA_vect) {
     using namespace bitbang::detail;
-	
+
     switch (tx_state) {
-	case TxState::RISE:
-		flip_tx_pins();
+    case TxState::RISE:
+        flip_tx_pins();
+        timer_set_compare();
         tx_state = TxState::FALL;
         break;
 
     case TxState::FALL:
-		flip_tx_pins();
-		
-        current_bit++;
-        if (current_bit >= 8) {
+        flip_tx_pins();
+
+        current_bit += 1;
+        if (current_bit >= 8) { // All bits done, set next byte if available
             if (tx_buf.available_for_read()) {
                 current_byte = tx_buf.pop_byte();
                 current_bit = 0;
-                tx_state = TxState::RISE;
             } else {
                 tx_state = TxState::EXIT;
+                break;
             }
-        } else {
-            tx_state = TxState::RISE;
         }
 
-		timer_set_compare();
+        tx_state = TxState::RISE;
         break;
 
     case TxState::EXIT:
-		flip_tx_pins();
-
-        if (tx_buf.available_for_read()) {
-            current_byte = tx_buf.pop_byte();
-            current_bit = 0;
-            tx_state = TxState::RISE;		// More data, move back into RISE state
-            timer_set_compare();
-        } else {
-            timer_stop();
-        }
+        timer_stop();
         break;
     }
 }
