@@ -24,13 +24,11 @@ constexpr uint16_t compute_ticks(uint16_t us, uint16_t tick_scalar) {
     return (us * tick_scalar) - 1;
 }
 
-inline bool timer_is_busy() {
-    return (TIMSK1 & (1 << OCIE1A)) != 0;
-}
-
-inline void timer_stop() {
-    TIMSK1 &= ~(1 << OCIE1A);
-}
+enum class TxState : uint8_t {
+    RISE,
+    FALL,
+    EXIT
+};
 
 // System & Timer Configurations
 constexpr uint32_t 	F_CPU_HZ		= F_CPU;	// Chip speed
@@ -47,25 +45,37 @@ constexpr uint8_t 	BIT_LOW_TICKS	= compute_ticks(BIT_LOW_US, TICK_SCALAR);
 
 // ISR state & Ring Buffer
 BitRingBuffer<128> 	tx_buf;
+volatile TxState    tx_state        = TxState::RISE;
 volatile uint8_t 	current_byte	= 0;
 volatile uint8_t 	current_bit		= 0;
-volatile bool 		was_risen 		= false;
 
-inline uint8_t get_current_tick() {
+inline void timer_set_compare() {
     bool is_bit_set = (current_byte & (1 << (7 - current_bit))) != 0;
-    return is_bit_set ? BIT_HIGH_TICKS : BIT_LOW_TICKS;
+    OCR1A = is_bit_set ? BIT_HIGH_TICKS : BIT_LOW_TICKS;
+}
+
+inline bool timer_is_busy() {
+    return (TIMSK1 & (1 << OCIE1A)) != 0;
+}
+
+inline void timer_stop() {
+    TIMSK1 &= ~(1 << OCIE1A);
+}
+
+inline void flip_tx_pins() {
+	PINB = (1 << PB2) | (1 << PB3);
 }
 
 inline void kickstart_ISR() {
 	if (!timer_is_busy()) {
 		ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 			// Load byte and reset state
-			current_byte = tx_buf.pop_byte();
-			current_bit = 0;
-			was_risen = false;
+			current_byte    = tx_buf.pop_byte();
+			current_bit     = 0;
+			tx_state        = TxState::RISE;
 
-			// Configure initial timing
-			OCR1A = get_current_tick();
+			// Set initial timing
+			timer_set_compare();
 
 			TCNT1 = 0;               // Start cleanly from tick 0
 			TIFR1 = (1 << OCF1A);    // Clear stale interrupt flags
@@ -80,17 +90,18 @@ namespace bitbang {
 using namespace detail;
 
 void PREFILL_FOR_TEST() {
-	for (size_t i = 0; i < 120; i++) {
-		tx_buf.push_byte(0);
+	for (size_t i = 0; i < 60; i++) {
+		tx_buf.push_byte(0xFF);
+        tx_buf.push_byte(0);
 	}
 }
 
 void init() {
     cli();							// Disable global interrupts during setup
 
-    DDRB |= (1 << PB2); 			// Set BITBANG_PIN as output
+    DDRB |= (1 << PB2); 			// Set PB2 as output
     DDRB |= (1 << PB3);
-    PINB  = (1 << PB3); 			// Flip PB3 opposed to PB2
+    // PINB  = (1 << PB3); 			// Flip PB3 opposed to PB2
 
     TCCR1A = 0;						// Reset Timer 1 Registers
     TCCR1B = 0;
@@ -147,25 +158,44 @@ struct Writer {
 // 2. Lower then load next bit
 
 ISR(TIMER1_COMPA_vect) {
-	using namespace bitbang::detail; 
+    using namespace bitbang::detail;
+	
+    switch (tx_state) {
+	case TxState::RISE:
+		flip_tx_pins();
+        tx_state = TxState::FALL;
+        break;
 
-	PINB = (1 << PB2) | (1 << PB3);		// Always flip the pins
+    case TxState::FALL:
+		flip_tx_pins();
+		
+        current_bit++;
+        if (current_bit >= 8) {
+            if (tx_buf.available_for_read()) {
+                current_byte = tx_buf.pop_byte();
+                current_bit = 0;
+                tx_state = TxState::RISE;
+            } else {
+                tx_state = TxState::EXIT;
+            }
+        } else {
+            tx_state = TxState::RISE;
+        }
 
-	was_risen = !was_risen;
-		
-	if (was_risen) {					// Falling edge, prepare next timing
-		current_bit += 1;
-		
-		if (current_bit >= 8) {
-			if (tx_buf.available_for_read()) {
-				current_byte = tx_buf.pop_byte();
-				current_bit = 0;
-			} else {
-				timer_stop(); 			// Buffer exhausted, stop interrupts
-				return;					// Early exit
-			}
-		}
-		OCR1A = get_current_tick();
-	}
+		timer_set_compare();
+        break;
+
+    case TxState::EXIT:
+		flip_tx_pins();
+
+        if (tx_buf.available_for_read()) {
+            current_byte = tx_buf.pop_byte();
+            current_bit = 0;
+            tx_state = TxState::RISE;		// More data, move back into RISE state
+            timer_set_compare();
+        } else {
+            timer_stop();
+        }
+        break;
+    }
 }
-
