@@ -52,23 +52,25 @@ namespace proto::dcc {
         Step28     = 0b11111  // 31
     };
 
-    enum class Direction    : uint8_t { FORWARD  = 0, BACKWARD = 1 };
-    enum class Light        : uint8_t { ON  = 0, OFF = 1 };
+    enum class Direction : uint8_t {
+        BACKWARD = 0,
+        FORWARD  = 1
+    };
 
     struct Instruction {
-        uint8_t speed    : 4;   // SSSS (0000 = Stop, 0001 = E-Stop, 0010-1111 = Steps 1-14)
-        uint8_t light    : 1;   // C    (0 = Off, 1 = On)
+        uint8_t speed    : 5;   // CSSSS (00000 = Stop, 00001 = E-Stop, 00010-11111 = Steps 1-14)
         uint8_t direction: 1;   // D    (Direction 0 = Reverse, 1 = Forward)
         uint8_t idata    : 2;   // 01   (Instruction data)
 
-        constexpr Instruction(Speed speed, Light light, Direction direction, uint8_t idata = 0b01)
+        constexpr Instruction(Speed speed, Direction direction, uint8_t idata = 0b01)
             : speed(static_cast<uint8_t>(speed)),
-            light(static_cast<uint8_t>(light)),
             direction(static_cast<uint8_t>(direction)),
             idata(idata) { }
 
         constexpr operator uint8_t() const {
-            return *reinterpret_cast<const uint8_t*>(this);
+            return static_cast<uint8_t>((idata     & 0b11) << 6) |
+                   static_cast<uint8_t>((direction & 0b1)  << 5) |
+                   static_cast<uint8_t>( speed     & 0b11111);
         }
     };
 
