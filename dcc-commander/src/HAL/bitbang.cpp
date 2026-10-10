@@ -75,14 +75,6 @@ inline void kickstart_ISR() {
 namespace bitbang {
 using namespace detail;
 
-// TODO: Remove
-void PREFILL_FOR_TEST() {
-	for (size_t i = 0; i < 60; i++) {
-		tx_buf.push_byte(0xFF);
-        tx_buf.push_byte(0);
-	}
-}
-
 void begin() {
     cli();							// Disable global interrupts during setup
 
