@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
 extern TIM_HandleTypeDef htim2;
 extern UART_HandleTypeDef huart2;
@@ -15,7 +16,7 @@ extern UART_HandleTypeDef huart2;
  */
 #define HIGH_T 58U
 #define LOW_T 100U
-#define VARIANCE 6U
+#define VARIANCE 8U
 
 #define PULSE_BUF_SIZE 2048U
 #define PULSE_BUF_MASK (PULSE_BUF_SIZE - 1U)
@@ -45,6 +46,14 @@ static uint32_t last_dump = 0U;
 void my_setup(void)
 {
     HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
+}
+
+inline bool is_pulse_high(uint32_t pulse_us) {
+    return pulse_us > (HIGH_T - VARIANCE) && pulse_us < (HIGH_T + VARIANCE);
+}
+
+inline bool is_pulse_low(uint32_t pulse_us) {
+    return pulse_us > (LOW_T - VARIANCE) && pulse_us < (LOW_T + VARIANCE);
 }
 
 
@@ -80,14 +89,16 @@ static void printpulse(uint32_t pulse_us)
 {
     char buf[32];
 
-    if (pulse_us > (HIGH_T - VARIANCE) &&
-        pulse_us < (HIGH_T + VARIANCE)) {
+    if (is_pulse_high(pulse_us)) {
         buf[0] = '1';
         buf[1] = '\0';
-    } else if (pulse_us > (LOW_T - VARIANCE) &&
-               pulse_us < (LOW_T + VARIANCE)) {
+    } else if (is_pulse_low(pulse_us)) {
         buf[0] = '0';
         buf[1] = '\0';
+    } else if (pulse_us > 1800000) {
+        buf[0] = '\r';
+        buf[1] = '\n';
+        buf[2] = '\0';
     } else {
         snprintf(buf, sizeof(buf), "[%lu]", (unsigned long)pulse_us);
     }
@@ -98,6 +109,80 @@ static void printpulse(uint32_t pulse_us)
         (uint16_t)strlen(buf),
         100U
     );
+}
+
+
+static uint8_t short_pulse_count = 0;
+static uint8_t long_pulse_count = 0;
+static uint8_t checked_byte = 0;
+static uint8_t current_bit = 0;
+
+
+static void parse_pulse(uint32_t pulse_us)
+{
+    uint8_t decoded_bit;
+
+    if (is_pulse_high(pulse_us))
+    {
+        long_pulse_count = 0;
+        short_pulse_count++;
+
+        if (short_pulse_count < 2)
+            return;
+
+        // Two consecutive short pulses = 1
+        decoded_bit = 1;
+        short_pulse_count = 0;
+    }
+    else if (is_pulse_low(pulse_us))
+    {
+        short_pulse_count = 0;
+        long_pulse_count++;
+
+        if (long_pulse_count < 2)
+            return;
+
+        // Two consecutive long pulses = 0
+        decoded_bit = 0;
+        long_pulse_count = 0;
+    }
+    else
+    {
+        // Invalid pulse: reset pairing
+        short_pulse_count = 0;
+        long_pulse_count = 0;
+        return;
+    }
+
+    // Append decoded bit MSB-first
+    checked_byte |= (uint8_t)(decoded_bit << (7 - current_bit));
+    current_bit++;
+
+    if (current_bit >= 8)
+    {
+        // Complete byte is ready in checked_byte.
+        char buf[16];
+
+        snprintf(buf, sizeof(buf), "0b%d%d%d%d%d%d%d%d\r\n",
+            (checked_byte >> 7) & 1,
+            (checked_byte >> 6) & 1,
+            (checked_byte >> 5) & 1,
+            (checked_byte >> 4) & 1,
+            (checked_byte >> 3) & 1,
+            (checked_byte >> 2) & 1,
+            (checked_byte >> 1) & 1,
+            checked_byte        & 1);
+
+        HAL_UART_Transmit(
+            &huart2,
+            (uint8_t *)buf,
+            (uint16_t)strlen(buf),
+            100U
+        );
+
+        checked_byte = 0;
+        current_bit = 0;
+    }
 }
 
 
@@ -119,10 +204,10 @@ static void printpulse_buffer(void)
          * Release the slot before transmitting, so the ISR can
          * reuse it while the comparatively slow UART is busy.
          */
-        pulse_tail =
-            (uint16_t)((tail + 1U) & PULSE_BUF_MASK);
+        pulse_tail = (uint16_t)((tail + 1U) & PULSE_BUF_MASK);
 
-        printpulse(pulse_ticks);
+        // printpulse(pulse_ticks);
+        parse_pulse(pulse_ticks);
         printed++;
     }
 
@@ -131,7 +216,7 @@ static void printpulse_buffer(void)
      * Cortex-M interrupt masking prevents the ISR from updating
      * these counters halfway through either read.
      */
-    {
+    if (0) {
         uint32_t primask = __get_PRIMASK();
         uint32_t captured_snapshot;
         uint32_t dropped_snapshot;
@@ -146,7 +231,7 @@ static void printpulse_buffer(void)
             __enable_irq();
         }
 
-        (void)snprintf(
+        snprintf(
             buf,
             sizeof(buf),
             "\r\nPrinted: %lu, Captured: %lu, Dropped: %lu\r\n",
@@ -155,7 +240,7 @@ static void printpulse_buffer(void)
             (unsigned long)dropped_snapshot
         );
 
-        (void)HAL_UART_Transmit(
+        HAL_UART_Transmit(
             &huart2,
             (uint8_t *)buf,
             (uint16_t)strlen(buf),
@@ -187,6 +272,8 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
         uint32_t captured_ticks = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
 
         checkpulse_buffered(captured_ticks);
+        // checkpulse_timing(captured_ticks);
+
         // printpulse(captured_ticks);
     }
 }
