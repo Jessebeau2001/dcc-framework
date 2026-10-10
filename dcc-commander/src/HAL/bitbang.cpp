@@ -37,12 +37,10 @@ constexpr uint8_t 	BIT_LOW_TICKS	= compute_ticks(F_CPU, PRESCALER, BIT_LOW_US);
 // ISR state & Ring Buffer
 BitRingBuffer<128> 	tx_buf;
 volatile TxState    tx_state        = TxState::RISE;
-volatile uint8_t 	current_byte	= 0;
-volatile uint8_t 	current_bit		= 0;
+volatile bool    	current_bit		= 0;
 
 inline void timer_set_compare() {
-    bool is_bit_set = (current_byte & (1 << (7 - current_bit))) != 0;
-    OCR1A = is_bit_set ? BIT_HIGH_TICKS : BIT_LOW_TICKS;
+    OCR1A = current_bit ? BIT_HIGH_TICKS : BIT_LOW_TICKS;
 }
 
 inline bool timer_is_busy() {
@@ -61,12 +59,11 @@ inline void kickstart_ISR() {
 	if (!timer_is_busy()) {
 		ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 			// Load first byte and reset state
-			current_byte    = tx_buf.pop_byte();
-			current_bit     = 0;
+			current_bit     = tx_buf.pop_bit();
             tx_state        = TxState::RISE;
-
-			TCNT1 = 0;               // Start cleanly from tick 0
+            
             timer_set_compare();
+			TCNT1 = 0;               // Start cleanly from tick 0
 			TIFR1 = (1 << OCF1A);    // Clear stale interrupt flags
 			TIMSK1 |= (1 << OCIE1A); // Enable interrupt
 		}
@@ -153,18 +150,13 @@ ISR(TIMER1_COMPA_vect) {
     case TxState::FALL:
         flip_tx_pins();
 
-        current_bit += 1;
-        if (current_bit >= 8) { // All bits done, set next byte if available
-            if (tx_buf.is_byte_available_for_read()) {
-                current_byte = tx_buf.pop_byte();
-                current_bit = 0;
-            } else {
-                tx_state = TxState::EXIT;
-                break;
-            }
+        if (tx_buf.is_bit_available_for_read()) {
+            current_bit = tx_buf.pop_bit();;
+            tx_state = TxState::RISE;
+        } else {
+            tx_state = TxState::EXIT;
         }
 
-        tx_state = TxState::RISE;
         break;
 
     case TxState::EXIT:
