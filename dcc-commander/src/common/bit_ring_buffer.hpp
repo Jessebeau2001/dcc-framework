@@ -41,14 +41,26 @@ struct BitRingBuffer {
     Marker head{}; // Mutated by producer
     Marker tail{}; // Mutated by consumer
 
-    inline size_t available_for_write() const {
-        // Calculate free whole-byte slots in the ring.
+    // Calculate free whole-byte slots in the ring.
+    inline size_t bytes_available_for_write() const {
         // Reserve one slot to distinguish a full buffer from an empty one.
         // MASK wraps the distance around the power-of-two buffer.
         return (static_cast<size_t>(tail.byte) + SIZE - head.byte - 1) & MASK;
     }
 
-    inline bool available_for_read() const {
+    inline size_t bits_available_for_write() {
+        const size_t head_pos = static_cast<size_t>(head.byte) * 8 + head.bit;
+        const size_t tail_pos = static_cast<size_t>(tail.byte) * 8 + tail.bit;
+
+        return (tail_pos + SIZE * 8 - head_pos - 1) & (SIZE * 8 - 1);
+    }
+
+
+    inline bool is_byte_available_for_read() const {
+        return tail.byte != head.byte;
+    }
+
+    inline bool is_bit_available_for_read() const {
         if (tail.byte != head.byte) return true;
         if (tail.bit != head.bit) return true;
         return false;

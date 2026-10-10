@@ -6,7 +6,7 @@
 namespace bitbang {
     void PREFILL_FOR_TEST();
     void begin();
-    size_t available_for_write();
+    size_t bytes_available_for_write();
 
     struct Writer {
         static void write_byte(uint8_t byte);

@@ -107,8 +107,8 @@ void begin() {
 //  - bits available
 //  - bytes available
 //  - or both as seperate callables
-size_t available_for_write() {
-    return tx_buf.available_for_write();
+size_t bytes_available_for_write() {
+    return tx_buf.bytes_available_for_write();
 }
 
 void Writer::write_byte(uint8_t byte) {
@@ -155,7 +155,7 @@ ISR(TIMER1_COMPA_vect) {
 
         current_bit += 1;
         if (current_bit >= 8) { // All bits done, set next byte if available
-            if (tx_buf.available_for_read()) {
+            if (tx_buf.is_byte_available_for_read()) {
                 current_byte = tx_buf.pop_byte();
                 current_bit = 0;
             } else {
