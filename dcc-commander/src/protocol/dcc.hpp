@@ -123,21 +123,6 @@ namespace proto::dcc {
         }
     };
 
-    template<uint8_t TimingHigh, uint8_t TimingLow, auto Writer>
-    struct TimingAdapter {
-        static inline constexpr void write_byte(uint8_t byte) {
-            for (uint8_t mask = 0x80; mask != 0; mask >>= 1) {
-                write_bit((byte & mask) != 0);
-            }
-        }
-
-        static inline constexpr void write_bit(bool bit) {
-            auto timing = bit ? TimingHigh : TimingLow;
-            Writer(timing);
-            Writer(timing);
-        }
-    };
-
     
     struct SerialWriter {
         static inline void write_byte(uint8_t byte) {

@@ -3,7 +3,6 @@
 
 #include "protocol/dcc.hpp"
 
-using proto::dcc::TimingAdapter;
 using proto::dcc::DccSerializer;
 using proto::dcc::DccController;
 using proto::dcc::Command;

@@ -92,10 +92,6 @@ void begin() {
     sei(); 							// Enable global interrupts
 }
 
-// TODO: This plain sucks, we have to pick:
-//  - bits available
-//  - bytes available
-//  - or both as seperate callables
 size_t bytes_available_for_write() {
     return tx_buf.bytes_available_for_write();
 }
