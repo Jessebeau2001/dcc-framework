@@ -13,15 +13,12 @@ extern UART_HandleTypeDef huart2;
 
 #define HIGH_T 58U
 #define LOW_T 100U
-#define VARIANCE 8U
+#define VARIANCE 4U
 
-#define PULSE_BUF_SIZE 2048U
-#define PULSE_BUF_MASK (PULSE_BUF_SIZE - 1U)
+#define PULSE_BUF_SIZE 15000U
+#define BUFFER_FLUSH_IMTERVAL 1000U
 
-#define T_DUMP_MS 2500U
-
-_Static_assert((PULSE_BUF_SIZE & PULSE_BUF_MASK) == 0U,
-               "PULSE_BUF_SIZE must be a power of two");
+#define DCC_DEBUG_MESSAGE_SHORT
 
 #define UART_PRINT_LIT(huart, str) \
     HAL_UART_Transmit(huart, (uint8_t *)(str), (uint16_t)(sizeof(str) - 1), 100U)
@@ -55,9 +52,10 @@ struct PulseDecoder {
     DecodePulseStatus status;
 };
 
-struct Stats {
-    volatile uint16_t pulses_dropped;
-    volatile uint16_t pulses_captured;
+struct ProcessStats {
+    volatile uint32_t dropped;
+    volatile uint32_t captured;
+    uint32_t processed;
 };
 
 struct ByteBuilder {
@@ -67,7 +65,7 @@ struct ByteBuilder {
 
 
 static struct PulseBuffer pulse_buffer = { .head = 0U, .tail = 0U };
-static struct Stats stats;
+static struct ProcessStats stats;
 static struct PulseDecoder pulse_decoder;
 static struct DccDecoder dcc_decoder;
 static struct ByteBuilder byte_builder;
@@ -99,16 +97,19 @@ int print_bin(char *buf, uint8_t value) {
 
 void buffer_write_pulse(
     struct PulseBuffer *buffer,
-    struct Stats *stats,
+    struct ProcessStats *stats,
     uint32_t pulse_ticks
 ) {
     uint16_t head = buffer->head;
-    uint16_t next = (uint16_t)((head + 1U) & PULSE_BUF_MASK);
+    uint16_t next = (uint16_t)(head + 1U);
+    if (next >= PULSE_BUF_SIZE) {
+        next = 0;
+    }
 
-    stats->pulses_captured++;
+    stats->captured++;
 
     if (next == buffer->tail) {
-        stats->pulses_dropped++;
+        stats->dropped++;
         return;
     }
 
@@ -185,8 +186,8 @@ void decode_pulse(struct PulseDecoder *decoder, uint32_t pulse_us) {
     }
 }
 
-static void idk() {
-    decode_pulse(&pulse_decoder, 32U);
+static void process_pulse_dcc(uint32_t pulse_us) {
+    decode_pulse(&pulse_decoder, pulse_us);
 
     if (pulse_decoder.status != PULSE_DECODER_BIT)
         return;
@@ -204,6 +205,17 @@ static void idk() {
         print_bin(instruction, dcc_decoder.instruction);
         print_bin(crc, dcc_decoder.crc);
 
+        #ifdef DCC_DEBUG_MESSAGE_SHORT
+        int len = snprintf(
+            msg,
+            sizeof(msg),
+            "%u %s %s %d\r\n",
+            (unsigned)dcc_decoder.address,
+            instruction,
+            crc,
+            dcc_decoder.crc == expected_crc
+        );
+        #else
         int len = snprintf(
             msg,
             sizeof(msg),
@@ -217,6 +229,7 @@ static void idk() {
             crc,
             (dcc_decoder.crc == expected_crc) ? "VALID" : "INVALID"
         );
+        #endif
 
         HAL_UART_Transmit(&huart2, (uint8_t *)msg, (uint16_t)len, 100U);
     }
@@ -226,8 +239,11 @@ static void idk() {
  * Print the samples that were queued when this function began.
  * The ISR continues capturing while UART transmission takes place.
  */
-uint32_t process_pulse_buffer(struct PulseBuffer *buffer)
-{
+static void process_pulse_buffer(
+    struct PulseBuffer *buffer,
+    struct ProcessStats *stats,
+    void (*process_pulse)(uint32_t)
+) {
     uint16_t end_head = buffer->head;
     uint32_t pulses_processed = 0U;
 
@@ -238,13 +254,16 @@ uint32_t process_pulse_buffer(struct PulseBuffer *buffer)
         /* Release the slot before transmitting, so the ISR can
          * reuse it while the comparatively slow UART is busy.
          */
-        buffer->tail = (uint16_t)((tail + 1U) & PULSE_BUF_MASK);
+        buffer->tail++;
+        if (buffer->tail >= PULSE_BUF_SIZE) {
+            buffer->tail = 0U;
+        }
 
-        print_pulse(pulse_ticks);
+        process_pulse(pulse_ticks);
         pulses_processed++;
     }
 
-    return pulses_processed;
+    stats->processed = pulses_processed;
 }
 
 /*
@@ -252,7 +271,7 @@ uint32_t process_pulse_buffer(struct PulseBuffer *buffer)
  * Cortex-M interrupt masking prevents the ISR from updating
  * these counters halfway through either read.
  */
-void check_process_stats(struct Stats *stats, uint32_t pulses_processed) {
+void check_process_stats(struct ProcessStats *stats) {
     uint32_t primask = __get_PRIMASK();
     uint32_t captured_snapshot;
     uint32_t dropped_snapshot;
@@ -260,8 +279,8 @@ void check_process_stats(struct Stats *stats, uint32_t pulses_processed) {
 
     __disable_irq();
 
-    captured_snapshot = stats->pulses_captured;
-    dropped_snapshot = stats->pulses_dropped;
+    captured_snapshot = stats->captured;
+    dropped_snapshot = stats->dropped;
 
     if (primask == 0U)
         __enable_irq();
@@ -270,7 +289,7 @@ void check_process_stats(struct Stats *stats, uint32_t pulses_processed) {
         buf,
         sizeof(buf),
         "\r\nProcessed: %lu, Captured: %lu, Dropped: %lu\r\n",
-        (unsigned long)pulses_processed,
+        (unsigned long)stats->processed,
         (unsigned long)captured_snapshot,
         (unsigned long)dropped_snapshot
     );
@@ -282,11 +301,12 @@ void my_loop(void)
 {
     uint32_t now = HAL_GetTick();
 
-    if ((uint32_t)(now - last_dump) >= T_DUMP_MS) {
+    if ((uint32_t)(now - last_dump) >= BUFFER_FLUSH_IMTERVAL) {
         last_dump = now;
         
-        uint32_t pulses_processed = process_pulse_buffer(&pulse_buffer);
-        check_process_stats(&stats, pulses_processed);
+        // process_pulse_buffer(&pulse_buffer, &stats, print_pulse);
+        process_pulse_buffer(&pulse_buffer, &stats, process_pulse_dcc);
+        check_process_stats(&stats);
     }
 }
 
