@@ -6,15 +6,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
-#include "dcc_decoder.h"
+#include "protocol/dcc_decoder.h"
 
 extern TIM_HandleTypeDef htim2;
 extern UART_HandleTypeDef huart2;
 
-/*
- * Assumption: TIM2 is configured for one timer tick per microsecond.
- * HAL_TIM_ReadCapturedValue() returns timer counts, not inherently us.
- */
 #define HIGH_T 58U
 #define LOW_T 100U
 #define VARIANCE 8U
@@ -22,8 +18,13 @@ extern UART_HandleTypeDef huart2;
 #define PULSE_BUF_SIZE 2048U
 #define PULSE_BUF_MASK (PULSE_BUF_SIZE - 1U)
 
+#define T_DUMP_MS 2500U
+
 _Static_assert((PULSE_BUF_SIZE & PULSE_BUF_MASK) == 0U,
                "PULSE_BUF_SIZE must be a power of two");
+
+#define UART_PRINT_LIT(huart, str) \
+    HAL_UART_Transmit(huart, (uint8_t *)(str), (uint16_t)(sizeof(str) - 1), 100U)
 
 /*
  * Single-producer / single-consumer ring buffer.
@@ -34,31 +35,49 @@ _Static_assert((PULSE_BUF_SIZE & PULSE_BUF_MASK) == 0U,
  * One slot is reserved to distinguish full from empty.
  * Usable capacity: 2047 samples.
  */
-static volatile uint32_t pulse_buffer[PULSE_BUF_SIZE];
-static volatile uint16_t pulse_head = 0U;
-static volatile uint16_t pulse_tail = 0U;
+struct PulseBuffer {
+    volatile uint32_t data[PULSE_BUF_SIZE];
+    volatile uint16_t head;
+    volatile uint16_t tail;
+};
 
-static volatile uint32_t pulse_dropped = 0U;
-static volatile uint32_t pulse_captured = 0U;
+typedef enum {
+    PULSE_DECODER_BIT,
+    PULSE_DECODER_INCOMPLETE,
+    PULSE_DECODER_INVALID_PAIRING
+} DecodePulseStatus;
+
+struct PulseDecoder {
+    uint8_t short_pulses;
+    uint8_t long_pulses;
+
+    bool latest_bit;
+    DecodePulseStatus status;
+};
+
+struct Stats {
+    volatile uint16_t pulses_dropped;
+    volatile uint16_t pulses_captured;
+};
+
+struct ByteBuilder {
+    uint8_t current_byte;
+    uint8_t bit_idx;
+};
+
+
+static struct PulseBuffer pulse_buffer = { .head = 0U, .tail = 0U };
+static struct Stats stats;
+static struct PulseDecoder pulse_decoder;
+static struct DccDecoder dcc_decoder;
+static struct ByteBuilder byte_builder;
 
 static uint32_t last_dump = 0U;
-
-static Decoder dcc_decoder;
-
 
 void my_setup(void)
 {
     HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
-
-    const char *welcome_msg = "System started\r\n";
-
-    HAL_UART_Transmit(
-        &huart2,
-        (uint8_t *)welcome_msg,
-        (uint16_t)strlen(welcome_msg),
-        100U
-    );
-
+    UART_PRINT_LIT(&huart2, "System started\r\n");
     init_decoder(&dcc_decoder, 0);
 }
 
@@ -70,145 +89,112 @@ inline bool is_pulse_low(uint32_t pulse_us) {
     return pulse_us > (LOW_T - VARIANCE) && pulse_us < (LOW_T + VARIANCE);
 }
 
+int print_bin(char *buf, uint8_t value) {
+    for (int i = 7; i >= 0; i--) {
+        buf[7 - i] = (value & (1U << i)) ? '1' : '0';
+    }
+    buf[8] = '\0';
+    return 9;
+}
 
-/*
- * Called from the capture callback.
- * No formatting, UART output, or blocking operations here.
- */
-static void record_pulse(uint32_t pulse_ticks)
-{
-    uint16_t head = pulse_head;
+void buffer_write_pulse(
+    struct PulseBuffer *buffer,
+    struct Stats *stats,
+    uint32_t pulse_ticks
+) {
+    uint16_t head = buffer->head;
     uint16_t next = (uint16_t)((head + 1U) & PULSE_BUF_MASK);
 
-    pulse_captured++;
+    stats->pulses_captured++;
 
-    if (next == pulse_tail) {
-        pulse_dropped++;
+    if (next == buffer->tail) {
+        stats->pulses_dropped++;
         return;
     }
 
-    pulse_buffer[head] = pulse_ticks;
-
-    /* Publish the entry only after writing the sample. */
-    pulse_head = next;
+    buffer->data[head] = pulse_ticks;
+    buffer->head = next; // Publish the entry only after writing the sample.
 }
 
 
 /*
  * Format and transmit one measurement.
- * Called exclusively from main-loop context.
  */
-static void print_pulse(uint32_t pulse_us)
+void print_pulse(uint32_t pulse_us)
 {
     char buf[32];
+    uint16_t size;
 
     if (is_pulse_high(pulse_us)) {
         buf[0] = '1';
         buf[1] = '\0';
+        size = 1;
     } else if (is_pulse_low(pulse_us)) {
         buf[0] = '0';
         buf[1] = '\0';
+        size = 1;
     } else if (pulse_us > 1800000) {
         buf[0] = '\r';
         buf[1] = '\n';
         buf[2] = '\0';
+        size = 2;
     } else {
-        snprintf(buf, sizeof(buf), "[%lu]", (unsigned long)pulse_us);
+        size = (uint16_t)snprintf(buf, sizeof(buf), "[%lu]", (unsigned long)pulse_us);
     }
 
-    HAL_UART_Transmit(
-        &huart2,
-        (uint8_t *)buf,
-        (uint16_t)strlen(buf),
-        100U
-    );
+    HAL_UART_Transmit(&huart2, (uint8_t *)buf, size, 100U);
 }
 
-
-static uint8_t short_pulse_count = 0;
-static uint8_t long_pulse_count = 0;
-static uint8_t checked_byte = 0;
-static uint8_t current_bit = 0;
-
-void append_bit_for_print(uint8_t bit) {
+void byte_append_bit(struct ByteBuilder *builder, uint8_t bit) {
     // Append decoded bit MSB-first
-    checked_byte |= (uint8_t)(bit << (7 - current_bit));
-    current_bit++;
+    builder->current_byte |= (uint8_t)(bit << (7 - builder->bit_idx));
+    builder->bit_idx++;
 
-    if (current_bit >= 8)
-    {
-        // Complete byte is ready in checked_byte.
-        char buf[16];
+    if (builder->bit_idx > 7)
+        builder->bit_idx = 0;
+}
 
-        snprintf(buf, sizeof(buf), "0b%d%d%d%d%d%d%d%d\r\n",
-            (checked_byte >> 7) & 1,
-            (checked_byte >> 6) & 1,
-            (checked_byte >> 5) & 1,
-            (checked_byte >> 4) & 1,
-            (checked_byte >> 3) & 1,
-            (checked_byte >> 2) & 1,
-            (checked_byte >> 1) & 1,
-            checked_byte        & 1);
+void decode_pulse(struct PulseDecoder *decoder, uint32_t pulse_us) {
+    if (is_pulse_high(pulse_us)) {
+        decoder->long_pulses = 0;
+        decoder->short_pulses++;
 
-        HAL_UART_Transmit(
-            &huart2,
-            (uint8_t *)buf,
-            (uint16_t)strlen(buf),
-            100U
-        );
+        if (decoder->short_pulses < 2) {
+            decoder->status = PULSE_DECODER_INCOMPLETE;
+        } else {
+            decoder->latest_bit = 1;
+            decoder->short_pulses = 0;
+            decoder->status = PULSE_DECODER_BIT;
+        }
+    } else if (is_pulse_low(pulse_us)) {
+        decoder->short_pulses = 0;
+        decoder->long_pulses++;
 
-        checked_byte = 0;
-        current_bit = 0;
+        if (decoder->long_pulses < 2) {
+            decoder->status = PULSE_DECODER_INCOMPLETE;
+        } else {
+            decoder->latest_bit = 0;
+            decoder->long_pulses = 0;
+            decoder->status = PULSE_DECODER_BIT;
+        }
+    } else {
+        // Invalid pulse - reset pairing
+        decoder->short_pulses = 0;
+        decoder->long_pulses = 0;
+        decoder->status = PULSE_DECODER_INVALID_PAIRING;
     }
 }
 
-void print_bin(char *buf, uint8_t value) {
-    for (int i = 7; i >= 0; i--) {
-        buf[7 - i] = (value & (1U << i)) ? '1' : '0';
-    }
-    buf[8] = '\0';
-}
+static void idk() {
+    decode_pulse(&pulse_decoder, 32U);
 
-static void process_pulse(uint32_t pulse_us)
-{
-    uint8_t decoded_bit;
-
-    if (is_pulse_high(pulse_us))
-    {
-        long_pulse_count = 0;
-        short_pulse_count++;
-
-        if (short_pulse_count < 2)
-            return;
-
-        // Two consecutive short pulses = 1
-        decoded_bit = 1;
-        short_pulse_count = 0;
-    }
-    else if (is_pulse_low(pulse_us))
-    {
-        short_pulse_count = 0;
-        long_pulse_count++;
-
-        if (long_pulse_count < 2)
-            return;
-
-        // Two consecutive long pulses = 0
-        decoded_bit = 0;
-        long_pulse_count = 0;
-    }
-    else
-    {
-        // Invalid pulse: reset pairing
-        short_pulse_count = 0;
-        long_pulse_count = 0;
+    if (pulse_decoder.status != PULSE_DECODER_BIT)
         return;
-    }
+    
+    process_dcc_bit(&dcc_decoder, pulse_decoder.latest_bit);
 
-    process_dcc_bit(&dcc_decoder, decoded_bit);
-
-    if (dcc_decoder.state == COMPLETE) {
-        dcc_decoder.state = PREAMBLE;
+    if (dcc_decoder.state == DCC_COMPLETE) {
+        dcc_decoder.state = DCC_PREAMBLE;
 
         char msg[128];
         char instruction[9];
@@ -232,15 +218,33 @@ static void process_pulse(uint32_t pulse_us)
             (dcc_decoder.crc == expected_crc) ? "VALID" : "INVALID"
         );
 
-        HAL_UART_Transmit(
-            &huart2,
-            (uint8_t *)msg,
-            (uint16_t)len,
-            100U
-        );
+        HAL_UART_Transmit(&huart2, (uint8_t *)msg, (uint16_t)len, 100U);
+    }
+}
+
+/*
+ * Print the samples that were queued when this function began.
+ * The ISR continues capturing while UART transmission takes place.
+ */
+uint32_t process_pulse_buffer(struct PulseBuffer *buffer)
+{
+    uint16_t end_head = buffer->head;
+    uint32_t pulses_processed = 0U;
+
+    while (buffer->tail != end_head) {
+        uint16_t tail = buffer->tail;
+        uint32_t pulse_ticks = buffer->data[tail];
+
+        /* Release the slot before transmitting, so the ISR can
+         * reuse it while the comparatively slow UART is busy.
+         */
+        buffer->tail = (uint16_t)((tail + 1U) & PULSE_BUF_MASK);
+
+        print_pulse(pulse_ticks);
+        pulses_processed++;
     }
 
-    // append_bit_for_print(decoded_bit);
+    return pulses_processed;
 }
 
 /*
@@ -248,7 +252,7 @@ static void process_pulse(uint32_t pulse_us)
  * Cortex-M interrupt masking prevents the ISR from updating
  * these counters halfway through either read.
  */
-static void print_snapshot_stats(uint32_t printed) {
+void check_process_stats(struct Stats *stats, uint32_t pulses_processed) {
     uint32_t primask = __get_PRIMASK();
     uint32_t captured_snapshot;
     uint32_t dropped_snapshot;
@@ -256,72 +260,37 @@ static void print_snapshot_stats(uint32_t printed) {
 
     __disable_irq();
 
-    captured_snapshot = pulse_captured;
-    dropped_snapshot = pulse_dropped;
+    captured_snapshot = stats->pulses_captured;
+    dropped_snapshot = stats->pulses_dropped;
 
-    if (primask == 0U) {
+    if (primask == 0U)
         __enable_irq();
-    }
 
-    snprintf(
+    int len = snprintf(
         buf,
         sizeof(buf),
-        "\r\nPrinted: %lu, Captured: %lu, Dropped: %lu\r\n",
-        (unsigned long)printed,
+        "\r\nProcessed: %lu, Captured: %lu, Dropped: %lu\r\n",
+        (unsigned long)pulses_processed,
         (unsigned long)captured_snapshot,
         (unsigned long)dropped_snapshot
     );
 
-    HAL_UART_Transmit(
-        &huart2,
-        (uint8_t *)buf,
-        (uint16_t)strlen(buf),
-        100U
-    );
+    HAL_UART_Transmit(&huart2, (uint8_t *)buf, (uint16_t)len, 100U);
 }
-
-/*
- * Print the samples that were queued when this function began.
- * The ISR continues capturing while UART transmission takes place.
- */
-static void process_pulse_buffer(void)
-{
-    uint16_t end_head = pulse_head;
-    uint32_t printed = 0U;
-
-    while (pulse_tail != end_head) {
-        uint16_t tail = pulse_tail;
-        uint32_t pulse_ticks = pulse_buffer[tail];
-
-        /*
-         * Release the slot before transmitting, so the ISR can
-         * reuse it while the comparatively slow UART is busy.
-         */
-        pulse_tail = (uint16_t)((tail + 1U) & PULSE_BUF_MASK);
-
-        // print_pulse(pulse_ticks);
-        process_pulse(pulse_ticks);
-        printed++;
-    }
-
-    // print_snapshot_stats(printed);
-}
-
 
 void my_loop(void)
 {
     uint32_t now = HAL_GetTick();
 
-    if ((uint32_t)(now - last_dump) >= 2500U) {
+    if ((uint32_t)(now - last_dump) >= T_DUMP_MS) {
         last_dump = now;
-        process_pulse_buffer();
+        
+        uint32_t pulses_processed = process_pulse_buffer(&pulse_buffer);
+        check_process_stats(&stats, pulses_processed);
     }
 }
 
 
-/*
- * HAL timer input-capture callback.
- */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 {
     if (htim->Instance == TIM2 &&
@@ -329,7 +298,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 
         uint32_t captured_ticks = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
 
-        record_pulse(captured_ticks);
+        buffer_write_pulse(&pulse_buffer, &stats, captured_ticks);
     }
 }
 
