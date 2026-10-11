@@ -16,7 +16,7 @@ using proto::dcc::SerialWriter;
 auto controller = DccController<DccSerializer<bitbang::Writer>>();
 
 Command cmd1 = {
-	.address = 55,
+	.address = 0, // Guide shows 55
 	.instruction = Instruction{
 		Speed::Step6,
 		Direction::FORWARD,
@@ -28,12 +28,19 @@ void setup() {
     bitbang::begin();
 }
 
+int frame_counter = 0;
+
+
 void loop() {
 	if (bitbang::bytes_available_for_write() > 40) {
-		cmd1.address++;
+		frame_counter++;
+		if (frame_counter > 128)  {
+			frame_counter = 0;
+			cmd1.address++;
+		}
 		controller.send_command(cmd1);
 	}
-	delay(500);
+	// delay(500);
 }
 
 /*
