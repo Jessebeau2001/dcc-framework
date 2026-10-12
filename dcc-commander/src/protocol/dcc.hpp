@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <HardwareSerial.h>
 
 /*  The DCC Pakcet Format
     See https://www.nmra.org/sites/default/files/s-92-2004-07.pdf
@@ -137,6 +138,7 @@ namespace proto::dcc {
         }
     };
 
+    /*
     void encode_manual_frame_example(const Command &cmd, uint8_t *out) {
         // uint64_t buffer = 0;
         // uint8_t *out = reinterpret_cast<uint8_t*>(&buffer);
@@ -161,5 +163,5 @@ namespace proto::dcc {
         out[5] = (checksum & 0b11100000) | 0b00010000;
 
         // GOAL: 11111111 11111111 0AAAAAAA A0IIIIII II0EEEEE EEE1....
-    }
+    }*/
 }
