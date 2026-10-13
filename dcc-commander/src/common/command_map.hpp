@@ -40,8 +40,35 @@ private:
     u8 find_index_of(uint8_t address) const;
 
 public:
-    bool put(dcc::Command &command);
+    class Cursor {
+    private:
+        const Container *data;
+        u8 cursor = 0;
+
+    public:
+        Cursor(const Container *data) : data(data) { }
+
+        const dcc::Command *next() {
+            for (u8 i = 0; i < Size; i++) {
+                const Container *container = &data[cursor];
+
+                cursor += 1;
+                if (cursor >= Size)
+                    cursor = 0;
+
+                if (container->is_set(Container::Flag::IN_USE))
+                    return &container->command;
+            }
+            return nullptr;
+        }
+    };
+
+    const dcc::Command *put(dcc::Command &command);
     void remove(uint8_t address);
+
+    Cursor create_cursor() const {
+        return Cursor(heap);
+    }
 
     static inline constexpr u8 size() {
         return Size;
@@ -49,6 +76,10 @@ public:
 
     inline u8 count() const {
         return count_;
+    }
+
+    inline bool is_empty() const {
+        return count_ == 0;
     }
 
     inline bool is_full() const {
