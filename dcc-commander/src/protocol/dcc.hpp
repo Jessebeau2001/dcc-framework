@@ -18,6 +18,7 @@
 */
 
 namespace dcc {
+    static constexpr u8 DCC_MAX_PACKET_SIZE = 6U; // 44 bits / 8 = 5.5 bytes = ~6 bytes
 
     template<typename Writer>
     class DccSerializer {
@@ -69,6 +70,8 @@ namespace dcc {
             .instruction = 0x00
         };
 
+        static constexpr u8 WRITER_SPACE_REQUIRED = 8 * DCC_MAX_PACKET_SIZE; // Keep 8 packets of size available
+
         DccSerializer<Writer> serializer;
         State state = State::WRITE_IDLE;
         
@@ -91,7 +94,7 @@ namespace dcc {
     
     public:
         void update() {
-            if (!(Writer::available() > 40))
+            if (!(Writer::available() > WRITER_SPACE_REQUIRED))
                 return;
 
             switch (state) {

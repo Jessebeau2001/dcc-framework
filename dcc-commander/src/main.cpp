@@ -10,12 +10,14 @@ using dcc::Instruction;
 using dcc::SpeedStep;
 using dcc::Direction;
 using dcc::SerialWriter;
+using dcc::DccScheduler;
 
 
-auto controller = DccController<DccSerializer<bitbang::Writer>>();
+// auto controller = DccController<DccSerializer<bitbang::Writer>>();
+auto scheduler = DccScheduler<bitbang::Writer>();
 
 Command cmd1 = {
-	.address = 0, // Guide shows 55
+	.address = 55, // Guide shows 55
 	.instruction = Instruction{
 		SpeedStep::Step6,
 		Direction::FORWARD,
@@ -25,21 +27,17 @@ Command cmd1 = {
 
 void setup() {
     bitbang::begin();
+	scheduler.schedule(cmd1);
+	cmd1.address = 75;
+	scheduler.schedule(cmd1);
+	cmd1.address = 1;
+	scheduler.schedule(cmd1);
+	cmd1.address = 36;
+	scheduler.schedule(cmd1);
 }
 
-int frame_counter = 0;
-
-
 void loop() {
-	if (bitbang::bytes_available_for_write() > 40) {
-		frame_counter++;
-		if (frame_counter > 128)  {
-			frame_counter = 0;
-			cmd1.address++;
-		}
-		controller.send_command(cmd1);
-	}
-	// delay(500);
+	scheduler.update();
 }
 
 /*

@@ -14,7 +14,7 @@ private:
 
         // No Padding! AVR is 8 bit
         dcc::Command command;    // 2 bytes
-        u8 header;                      // 1 byte
+        u8 header;               // 1 byte
 
         inline bool is_set(Flag flag) const {
             return (header & static_cast<uint8_t>(flag));
@@ -36,8 +36,8 @@ private:
     Container heap[Size];
     u8 count_ = 0;
 
-    u8 find_empty_index() const;
-    u8 find_index_of(uint8_t address) const;
+    i16 find_empty_index() const;
+    i16 find_index_of(uint8_t address) const;
 
 public:
     class Cursor {

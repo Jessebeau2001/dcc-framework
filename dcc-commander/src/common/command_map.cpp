@@ -12,7 +12,7 @@ void CommandMap::Container::place_command(dcc::Command &command) {
 }
 
 
-u8 CommandMap::find_empty_index() const {
+i16 CommandMap::find_empty_index() const {
     for (u8 i = 0; i < Size; i++) {
         if (heap[i].is_set(Container::Flag::IN_USE) == 0)
             return i;
@@ -21,7 +21,7 @@ u8 CommandMap::find_empty_index() const {
     return -1;
 }
 
-u8 CommandMap::find_index_of(u8 address) const {
+i16 CommandMap::find_index_of(u8 address) const {
     for (u8 i = 0; i < Size; i++) {
         if (heap[i].is_set(Container::Flag::IN_USE) &&
             heap[i].command.address == address
@@ -34,7 +34,7 @@ u8 CommandMap::find_index_of(u8 address) const {
 }
 
 const dcc::Command *CommandMap::put(dcc::Command &command) {
-    int index = find_index_of(command.address);
+    i16 index = find_index_of(command.address);
 
     if (index == -1) {              // Address not yet on heap
         if (is_full())              // Cannot allocate new slot, heap full
@@ -50,7 +50,7 @@ const dcc::Command *CommandMap::put(dcc::Command &command) {
 }
 
 void CommandMap::remove(uint8_t address) {
-    for (int i = 0; i < Size; i++) {
+    for (u8 i = 0; i < Size; i++) {
         Container &slot = heap[i];
 
         if (slot.is_set(Container::Flag::IN_USE) &&
