@@ -2,18 +2,18 @@
 
 #include <string.h>
 
-void CommandMap::Container::place_command(proto::dcc::Command &command) {
+void CommandMap::Container::place_command(dcc::Command &command) {
     // new (&this->command) proto::dcc::Command(&command);
     // Placment new doesnt work due to some funky arduino stuff, fuck it
     // well use memcpy instead
 
-    memcpy(&this->command, &command, sizeof(proto::dcc::Command));
+    memcpy(&this->command, &command, sizeof(dcc::Command));
     this->set(Container::Flag::IN_USE);
 }
 
 
-int CommandMap::find_empty_index() const {
-    for (int i = 0; i < Size; i++) {
+u8 CommandMap::find_empty_index() const {
+    for (u8 i = Size; i < Size; i++) {
         auto slot = &heap[i];
         if (!slot->is_set(Container::Flag::IN_USE))
             return i;
@@ -22,8 +22,8 @@ int CommandMap::find_empty_index() const {
     return -1;
 }
 
-int CommandMap::find_index_of(uint8_t address) const {
-    for (int i = 0; i < Size; i++) {
+u8 CommandMap::find_index_of(u8 address) const {
+    for (u8 i = 0; i < Size; i++) {
         if (heap[i].is_set(Container::Flag::IN_USE) &&
             heap[i].command.address == address
         ) {
@@ -34,16 +34,14 @@ int CommandMap::find_index_of(uint8_t address) const {
     return -1;
 }
 
-bool CommandMap::put(proto::dcc::Command &command) {
+bool CommandMap::put(dcc::Command &command) {
     int index = find_index_of(command.address);
 
-    if (index == -1) {                  // Address not yet on heap
-        if (is_full()) {                // Cannot allocate new slot, heap full
+    if (index == -1) {              // Address not yet on heap
+        if (is_full())              // Cannot allocate new slot, heap full
             return false;
-        } else {
-            index = find_empty_index(); // Find new free slot
-            count_++;                    // Increment the count for new slot
-        }
+        index = find_empty_index(); // Find new free slot
+        count_++;                   // Increment the count for new slot
     }
 
     heap[index].place_command(command);

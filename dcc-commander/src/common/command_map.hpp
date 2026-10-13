@@ -1,18 +1,20 @@
 #pragma once
 
-#include <stdint.h>
-#include "protocol/dcc.hpp"
+#include <types.h>
+#include "protocol/dcc_def.h"
+
+using namespace types;
 
 class CommandMap {
 private:
     struct Container {
-        enum class Flag : uint8_t {
+        enum class Flag : u8 {
             IN_USE    = 0b10000000
         };
 
         // No Padding! AVR is 8 bit
-        proto::dcc::Command command; // 2 bytes
-        uint8_t header;       // 1 byte
+        dcc::Command command;    // 2 bytes
+        u8 header;                      // 1 byte
 
         inline bool is_set(Flag flag) const {
             return (header & static_cast<uint8_t>(flag));
@@ -26,25 +28,26 @@ private:
             header &= ~static_cast<uint8_t>(flag);
         }
 
-        void place_command(proto::dcc::Command &command);
+        void place_command(dcc::Command &command);
     };
 
-    static constexpr uint8_t Size = 16U;
+    static constexpr u8 Size = 16U;
 
     Container heap[Size];
-    uint8_t count_ = 0;
+    u8 count_ = 0;
 
-    int find_empty_index() const;
-    int find_index_of(uint8_t address) const;
+    u8 find_empty_index() const;
+    u8 find_index_of(uint8_t address) const;
+
 public:
-    bool put(proto::dcc::Command &command);
+    bool put(dcc::Command &command);
     void remove(uint8_t address);
 
-    static inline constexpr uint8_t size() {
+    static inline constexpr u8 size() {
         return Size;
     }
 
-    inline uint8_t count() const {
+    inline u8 count() const {
         return count_;
     }
 
