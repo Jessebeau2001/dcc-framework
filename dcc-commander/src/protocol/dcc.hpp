@@ -4,7 +4,6 @@
 #include <HardwareSerial.h>
 #include <protocol/dcc_def.h>
 #include <common/command_map.hpp>
-#include <HAL/bitbang.hpp>
 
 /*  The DCC Pakcet Format
     See https://www.nmra.org/sites/default/files/s-92-2004-07.pdf
@@ -117,7 +116,7 @@ namespace dcc {
             return result != nullptr;
         }
 
-        void clear(u8 address) {
+        void remove(u8 address) {
             scheduled.remove(address);
             if (scheduled.is_empty())
                 state = State::WRITE_IDLE;
@@ -125,17 +124,14 @@ namespace dcc {
     };
 
 
-    template <typename Serializer>
+    template <typename Writer>
     class DccController {
     private:
-        Serializer serializer;
-
+        DccScheduler<Writer> scheduler;
+    
     public:
-        void send_command(const Command &command) {
-            serializer.frame_open();
-            serializer.write_byte(command.address);
-            serializer.write_byte(static_cast<uint8_t>(command.instruction));
-            serializer.frame_close();
+        void update() {
+
         }
     };
 
