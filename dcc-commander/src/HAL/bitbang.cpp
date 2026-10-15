@@ -14,9 +14,9 @@ namespace bitbang::detail {
         Target Ticks = (Interval_in_seconds) * (Timer_Clock_Freq) - 1
         Target Ticks = (us / 1,000,000)      * (sys_clk / prescaler) - 1
 */
-constexpr uint16_t compute_ticks(uint32_t f_cpu, uint16_t prescaler, uint16_t us) {
+constexpr u32 compute_ticks(u32 f_cpu, u16 prescaler, u16 us) {
     // Formula: (us * f_cpu) / (1000000UL * prescaler) - 1
-    return static_cast<uint16_t>((static_cast<uint64_t>(us) * f_cpu) / (1000000UL * prescaler) - 1);
+    return static_cast<u32>((static_cast<u64>(us) * f_cpu) / (1'000'000UL * prescaler) - 1);
 }
 
 enum class TxState : uint8_t {
@@ -26,13 +26,19 @@ enum class TxState : uint8_t {
 };
 
 // System & Timer Configurations
-constexpr uint16_t 	PRESCALER		= 8;		// Prescaler divider (1, 8, 64, 256, 1024)
-constexpr uint8_t	BIT_HIGH_US 	= 58;		// Bit high time in microseconds
-constexpr uint8_t	BIT_LOW_US  	= 100;		// Bit low time in microseconds
+constexpr u16 	    PRESCALER		= 8;		// Prescaler divider (1, 8, 64, 256, 1024)
+constexpr u16	    BIT_HIGH_US 	= 58;		// Bit high time in microseconds
+constexpr u16	    BIT_LOW_US  	= 100;		// Bit low time in microseconds
 
 // Computed timing constants
-constexpr uint8_t 	BIT_HIGH_TICKS	= compute_ticks(F_CPU, PRESCALER, BIT_HIGH_US);
-constexpr uint8_t 	BIT_LOW_TICKS	= compute_ticks(F_CPU, PRESCALER, BIT_LOW_US);
+constexpr u16 	    BIT_HIGH_TICKS	= compute_ticks(F_CPU, PRESCALER, BIT_HIGH_US);
+constexpr u16 	    BIT_LOW_TICKS	= compute_ticks(F_CPU, PRESCALER, BIT_LOW_US);
+
+static_assert(compute_ticks(F_CPU, PRESCALER, BIT_HIGH_US) <= UINT16_MAX,
+              "BIT_HIGH_TICKS overflows 16-bit range!");
+
+static_assert(compute_ticks(F_CPU, PRESCALER, BIT_LOW_US) <= UINT16_MAX,
+              "BIT_LOW_TICKS overflows 16-bit range!");
 
 // ISR state & Ring Buffer
 BitRingBuffer<128> 	tx_buf;
@@ -96,7 +102,7 @@ size_t bytes_available_for_write() {
     return tx_buf.bytes_available_for_write();
 }
 
-void Writer::write_byte(uint8_t byte) {
+void Writer::write_byte(u8 byte) {
     tx_buf.push_byte(byte);
     kickstart_ISR();
 }
