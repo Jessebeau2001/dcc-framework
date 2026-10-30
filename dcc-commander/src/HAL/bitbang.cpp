@@ -5,6 +5,7 @@
 #include <util/atomic.h>
 
 #include "common/bit_ring_buffer.hpp"
+#include "platform/avr_def.h"
 
 namespace bitbang::detail {
 /*  In hardware CTC mode (WGM12), Timer1 counts from 0 up to N.
@@ -57,10 +58,6 @@ inline void timer_stop() {
     TIMSK1 &= ~(1 << OCIE1A);
 }
 
-inline void flip_tx_pins() {
-	PINB = (1 << PB2) | (1 << PB3);
-}
-
 inline void kickstart_ISR() {
 	if (!timer_is_busy()) {
 		ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
@@ -84,9 +81,7 @@ using namespace detail;
 void begin() {
     cli();							// Disable global interrupts during setup
 
-    DDRB |= (1 << PB2); 			// Set PB2 as output
-    DDRB |= (1 << PB3);
-    // PINB  = (1 << PB3); 			// Flip PB3 opposed to PB2
+    pins::setup_tx();
 
     TCCR1A = 0;						// Reset Timer 1 Registers
     TCCR1B = 0;
@@ -136,13 +131,13 @@ ISR(TIMER1_COMPA_vect) {
 
     switch (tx_state) {
     case TxState::RISE:
-        flip_tx_pins();
+        bitbang::pins::flip_tx();
         timer_set_compare();
         tx_state = TxState::FALL;
         break;
 
     case TxState::FALL:
-        flip_tx_pins();
+        bitbang::pins::flip_tx();
 
         if (tx_buf.is_bit_available_for_read()) {
             current_bit = tx_buf.pop_bit();;
@@ -154,7 +149,7 @@ ISR(TIMER1_COMPA_vect) {
         break;
 
     case TxState::EXIT:
-        flip_tx_pins();
+        bitbang::pins::flip_tx();
         timer_stop();
         break;
     }
