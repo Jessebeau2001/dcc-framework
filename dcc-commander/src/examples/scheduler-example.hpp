@@ -59,6 +59,7 @@ void update_scheduling() {
 }
 
 void setup() {
+	Serial.begin(9600);
     bitbang::begin();
 }
 

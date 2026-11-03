@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <examples/scheduler-example.hpp>
+#include <examples/scheduler-example-single.hpp>
 
 /*
 a packet is 3 bytes + 2 preamble bytes + 4 seperators = 44 bits

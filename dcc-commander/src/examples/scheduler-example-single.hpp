@@ -40,6 +40,12 @@ void update_addr() {
 }
 
 void setup() {
+	digitalWrite(7, HIGH); // Set hat enable pin
+	pinMode(7, OUTPUT);
+	
+	pinMode(9, OUTPUT);		// Set disable sleep pin
+	digitalWrite(9, HIGH);
+	
 	Serial.begin(9600);
     bitbang::begin();
 	scheduler.schedule(cmd);
