@@ -11,13 +11,16 @@ inline void setup_tx() {
 inline void flip_tx() {
     PINB = (1 << PB2) | (1 << PB3);
 }
+
 #elif defined(ARDUINO_AVR_MEGA2560)
+
 inline void setup_tx() {
-    DDRE |= (1 << PE3);
+    DDRH |= (1 << PH5); // Mega Pin 8
 }
 
 inline void flip_tx() {
-    PINE = (1 << PE3);
+    PINH = (1 << PH5);
 }
+
 #endif
 } // bitbang::pins
