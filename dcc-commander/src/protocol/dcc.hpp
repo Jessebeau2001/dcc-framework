@@ -22,7 +22,7 @@ namespace dcc {
     template<typename Writer>
     class DccSerializer {
     private:
-        uint8_t checksum = 0;
+        u8 checksum = 0;
 
     public:
         DccSerializer() { }
@@ -42,6 +42,18 @@ namespace dcc {
             checksum ^= byte; // Checksum is exclusive or of every byte send
         }
 
+        void write_address(u16 address) {
+            if (address > 127) {
+                // Bit of magic to make the first two bits always 11
+                u8 upper = static_cast<u8>(0b11000000 | ((address >> 8) & 0b00111111));
+                u8 lower = static_cast<u8>(address & 0b11111111);
+                write_byte(upper);
+                write_byte(lower);
+            } else {
+                write_byte(static_cast<u8>(address));
+            }
+        }
+
         void frame_close() {
             Writer::write_byte(checksum);
             Writer::write_bit(1);
@@ -49,8 +61,10 @@ namespace dcc {
 
         void serialize(const Command &command) {
             frame_open();
-            write_byte(command.address);
-            write_byte(static_cast<uint8_t>(command.instruction));
+
+            write_address(command.address);
+            write_byte(static_cast<u8>(command.instruction));
+
             frame_close();
         }
     };

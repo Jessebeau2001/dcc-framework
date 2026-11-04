@@ -69,7 +69,7 @@ namespace dcc {
 
 
     struct Command {
-        u8 address;        // Address is a byte
+        u16 address;        // Address is a byte
         u8 instruction;    // Single instruction is also always a byte
     };
 }
