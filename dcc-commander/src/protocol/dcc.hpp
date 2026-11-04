@@ -130,7 +130,7 @@ namespace dcc {
             return result != nullptr;
         }
 
-        void remove(u8 address) {
+        void remove(u16 address) {
             scheduled.remove(address);
             if (scheduled.is_empty())
                 state = State::WRITE_IDLE;

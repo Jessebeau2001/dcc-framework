@@ -4,8 +4,8 @@
 
 void CommandMap::Container::place_command(dcc::Command &command) {
     // new (&this->command) proto::dcc::Command(&command);
-    // Placment new doesnt work due to some funky arduino stuff, fuck it
-    // well use memcpy instead
+    // Placement new doesnt work due to some funky arduino api stuff, fuck it
+    // we'll use memcpy instead
 
     memcpy(&this->command, &command, sizeof(dcc::Command));
     this->set(Container::Flag::IN_USE);
@@ -21,12 +21,12 @@ i16 CommandMap::find_empty_index() const {
     return -1;
 }
 
-i16 CommandMap::find_index_of(u8 address) const {
+i16 CommandMap::find_index_of(u16 address) const {
     for (u8 i = 0; i < Size; i++) {
         if (heap[i].is_set(Container::Flag::IN_USE) &&
             heap[i].command.address == address
         ) {
-            return i; 
+            return i;
         }
     }
 
@@ -49,7 +49,7 @@ const dcc::Command *CommandMap::put(dcc::Command &command) {
     return &container->command;
 }
 
-void CommandMap::remove(uint8_t address) {
+void CommandMap::remove(u16 address) {
     for (u8 i = 0; i < Size; i++) {
         Container &slot = heap[i];
 

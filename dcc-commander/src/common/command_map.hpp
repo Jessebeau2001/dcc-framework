@@ -37,7 +37,7 @@ private:
     u8 count_ = 0;
 
     i16 find_empty_index() const;
-    i16 find_index_of(uint8_t address) const;
+    i16 find_index_of(u16 address) const;
 
 public:
     class Cursor {
@@ -64,7 +64,7 @@ public:
     };
 
     const dcc::Command *put(dcc::Command &command);
-    void remove(uint8_t address);
+    void remove(u16 address);
 
     Cursor create_cursor() const {
         return Cursor(heap);
