@@ -4,6 +4,7 @@
 #include <types.h>
 #include <HAL/bitbang.hpp>
 #include <protocol/dcc.hpp>
+#include <Arduino.h>
 
 using namespace types;
 

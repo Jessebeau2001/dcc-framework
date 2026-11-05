@@ -1,4 +1,3 @@
-#include <Arduino.h>
 #include <examples/scheduler-example-single.hpp>
 
 /*
