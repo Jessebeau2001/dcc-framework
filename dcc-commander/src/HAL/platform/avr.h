@@ -1,4 +1,5 @@
 #pragma once
+
 #include <avr/io.h>
 
 namespace bitbang::pins {

@@ -5,7 +5,7 @@
 #include <util/atomic.h>
 
 #include "common/bit_ring_buffer.hpp"
-#include "platform/avr_def.h"
+#include "platform/avr.h"
 
 namespace bitbang::detail {
 /*  In hardware CTC mode (WGM12), Timer1 counts from 0 up to N.
