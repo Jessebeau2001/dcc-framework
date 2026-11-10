@@ -7,27 +7,29 @@ using namespace types;
 
 namespace detail {
 
-template <uintptr_t Address>
+template <uintptr_t Address, typename T>
 struct RegisterBase {
+    using ValueType = T;
     static constexpr uintptr_t address = Address;
 
 protected:
-    static inline u8 read() {
-        return *reinterpret_cast<volatile u8*>(Address);
+    static inline T read() {
+        return *reinterpret_cast<volatile T*>(Address);
     }
 
-    static inline void write(u8 value) {
-        *reinterpret_cast<volatile u8*>(Address) = value;
+    static inline void write(T value) {
+        *reinterpret_cast<volatile T*>(Address) = value;
     }
 };
 
 }
 
-template <uintptr_t Address>
-struct ReadonlyRegister : private detail::RegisterBase<Address> {
-    using Base = detail::RegisterBase<Address>;
+template <uintptr_t Address, typename T = u8>
+struct ReadonlyRegister : private detail::RegisterBase<Address, T> {
+    using Base = detail::RegisterBase<Address, T>;
+    using ValueType = typename Base::ValueType;
 
-    static inline u8 read() {
+    static inline T read() {
         return Base::read();
     }
 };

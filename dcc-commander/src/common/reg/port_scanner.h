@@ -5,14 +5,16 @@
 
 using namespace types;
 
-
 template <typename Reg>
-class PortScanner {
-private:
-    u8 debounced = 0;
-    u8 cnt0 = 0;
-    u8 cnt1 = 0;
-
+struct PortScanner {
+    using ValueType = typename Reg::ValueType;
+    
+    // State values are dependant on register width
+    struct State {
+        ValueType value;
+        ValueType cnt0;
+        ValueType cnt1;
+    };
     /* This uses a parallel vertical counter algorithm to debounce - Example:
         delta = reading ^ debounced             | 1 ^ 0 = 1         (disagreement detected)
         cnt0 = ~cnt0 & delta                    |  ~0 & 1 = 1       (cnt0 updates to 1)
@@ -21,22 +23,13 @@ private:
         debounced ^= stable_mask;               | 0 ^= 0 = 0        (stable state remains unchanged on tick 1
     */
 
-public:
-    inline void update() {
-        u8 delta = Reg::read() ^ debounced;         // XOR delta of known good and new data
+    static inline void update(State& s) {
+        u8 delta = Reg::read() ^ s.value;               // XOR delta of known good and new data
 
-        cnt0 = ~cnt0 & delta;                       // Count up 1 in counters for every delta bit
-        cnt1 = (cnt0 ^ cnt1) & delta;               // Same for counter 1
+        s.cnt0 = ~s.cnt0 & delta;                       // Count up 1 in counters for every delta bit
+        s.cnt1 = (s.cnt0 ^ s.cnt1) & delta;             // Same for counter 1
 
-        u8 stable_mask = ~(cnt0 | cnt1) & delta;    // Isolate bits that counted to 2 succesfully
-        debounced ^= stable_mask;                   // Merge the stable bits onto the known good value
-    }
-
-    inline u8 read() const {
-        return debounced;
+        u8 stable_mask = ~(s.cnt0 | s.cnt1) & delta;    // Isolate bits that counted to 2 succesfully
+        s.value ^= stable_mask;                         // Merge the stable bits onto the known good value
     }
 };
-
-// Example
-// #define ADDR_GPIO_B 0x23
-// auto scanner = PortScanner<ReadonlyRegister<ADDR_GPIO_B>>

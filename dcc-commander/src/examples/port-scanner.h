@@ -7,12 +7,15 @@
 #define PORTB_ADDR 0x05
 #define DDRB_ADDR 0x04
 
-auto scanner = PortScanner<ReadonlyRegister<PORTB_ADDR>>();
+using MY_PORTB = ReadonlyRegister<PORTB_ADDR>;
+using Scanner = PortScanner<MY_PORTB>;
+Scanner::State sensor_state_a = Scanner::State();
 
 void setup() {
+    // No abstraction for this yet, just keep as is for simple example
     *(volatile u8*)DDRB_ADDR = 0x00;
 }
 
 void loop() {
-    scanner.update();
+    Scanner::update(sensor_state_a);
 }
