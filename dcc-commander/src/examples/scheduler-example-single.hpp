@@ -1,8 +1,7 @@
 #pragma once
 
-#include <Arduino.h>
-#include <types.h>
 #include <HAL/bitbang.hpp>
+#include <protocol/station.hpp>
 #include <protocol/dcc.hpp>
 #include <Arduino.h>
 
@@ -50,6 +49,12 @@ void setup() {
 	Serial.begin(9600);
     bitbang::begin();
 	scheduler.schedule(cmd);
+
+	auto station = Station{
+		.id = 0
+	};
+
+	auto test = StationManager::is_occupied<ReadonlyRegister<0x23>>(station);
 }
 
 void loop() {
