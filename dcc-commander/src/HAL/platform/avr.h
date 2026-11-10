@@ -2,28 +2,19 @@
 
 #include <avr/io.h>
 
-namespace bitbang::pins {
 #if defined(ARDUINO_AVR_UNO)
-
-inline void setup_tx() {
-    DDRB |= (1 << PB0);     // Uno pin 8
-}
-
-inline void flip_tx() {
-    PINB = (1 << PB2) | (1 << PB3);
-}
-
+    #define BITBANG_DDR     DDRB
+    #define BITBANG_PINR    PINB
+    #define BITBANG_PIN     PB0     // Uno pin 8
 #elif defined(ARDUINO_AVR_MEGA2560)
-
-inline void setup_tx() {
-    DDRH |= (1 << PH5);     // Mega Pin 8
-}
-
-inline void flip_tx() {
-    PINH = (1 << PH5);
-}
-
+    #define BITBANG_DDR     DDRH
+    #define BITBANG_PINR    PINH
+    #define BITBANG_PIN     PH5     // Mega pin 8
 #else
-#error "Unsuported/unconfigured board pinout"
+    #error "Unsuported/unconfigured board pinout"
 #endif
-} // bitbang::pins
+
+namespace bitbang::tx {
+    inline void setup() { BITBANG_DDR |= (1 << BITBANG_PIN); }
+    inline void flip()  { BITBANG_PINR = (1 << BITBANG_PIN); }
+} // bitbang::tx
