@@ -6,8 +6,10 @@
 
 using namespace types;
 
+struct Station;
+
 struct StationNode {
-    // Station *station;
+    Station *station;
 
     StationNode *next;
     StationNode *prev;
@@ -20,7 +22,7 @@ struct GraphStationMap {
 
 template <u8 Size>
 struct LinearStationMap {
-    // Station stations[Size];
+    Station stations[Size];
 };
 
 void set_next(StationNode &current, StationNode *append) {
@@ -37,24 +39,18 @@ void set_prev(StationNode &current, StationNode *append) {
     current.prev = append;
 }
 
-template <u8 Index>
-struct StationView {
-    using Left   = BitView<Index>;
-    using Center = BitView<Index>;
-    using Right  = BitView<Index>;
-};
-
-template <u8 Id>
 struct StationConfig {
-    static constexpr u8 id = Id;
-    using View = StationView<Id>;
+    u8 pin_left;
+    u8 pin_center;
+    u8 pin_right;
 };
 
-template <u8 Id>
 struct Station {
-    using Config = StationConfig<Id>;
-    // Can add geuine runtime data here
+    StationConfig config;
+    u8 id;
 };
+
+
 
 enum StationOcupancy {
     EMPTY,
@@ -62,11 +58,6 @@ enum StationOcupancy {
     OCCUPIED,
     APROACH_RIGHT
 };
-
-// constexpr StationConfig STATION_1 {
-//     .id = 1,
-//     .pin_index = 0
-// };
 
 class StationTracker {
 private:
@@ -80,23 +71,8 @@ public:
         center_data(center_data),
         right_data(right_data) { }
 
-
-    template <u8 Id>
-    StationOcupancy check_occupancy(const Station<Id> &station) const {
-        using View = typename Station<Id>::Config::View;
-        if (View::Left::is_set(left_data)) {
-            return StationOcupancy::ARPOACH_LEFT;
-        } else if (View::Center::is_set(center_data)) {
-            return StationOcupancy::OCCUPIED;
-        } else if (View::Right::is_set(right_data)) {
-            return StationOcupancy::APROACH_RIGHT;
-        } else {
-            return EMPTY;
-        }
-    }
-
-    StationOcupancy check_occupancy_(u8 index) const {
-        u8 mask = 1 << index;
+    StationOcupancy check_occupancy(const Station& station) const {
+        u8 mask = 1 << station.id;
         if ((left_data & mask) != 0) {
             return StationOcupancy::ARPOACH_LEFT;
         } else if ((center_data & mask) != 0) {
