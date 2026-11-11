@@ -1,4 +1,4 @@
-#include <examples/scheduler-example-single.hpp>
+#include <examples/port-scanner.h>
 
 /*
 a packet is 3 bytes + 2 preamble bytes + 4 seperators = 44 bits

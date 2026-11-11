@@ -15,6 +15,7 @@ struct PortScanner {
         ValueType cnt0;
         ValueType cnt1;
     };
+    
     /* This uses a parallel vertical counter algorithm to debounce - Example:
         delta = reading ^ debounced             | 1 ^ 0 = 1         (disagreement detected)
         cnt0 = ~cnt0 & delta                    |  ~0 & 1 = 1       (cnt0 updates to 1)
