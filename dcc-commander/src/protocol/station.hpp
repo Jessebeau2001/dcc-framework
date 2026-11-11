@@ -39,14 +39,24 @@ void set_prev(StationNode &current, StationNode *append) {
     current.prev = append;
 }
 
+template <auto& Ref, u8 Pin>
+struct DataHandle {
+    using View = BitView<Pin, u8>;
+
+    static constexpr bool is_set() {
+        return View::is_set(Ref);
+    }
+};
+
+template <u8 PinL, u8 PinC, u8 PinR>
 struct StationConfig {
-    u8 pin_left;
-    u8 pin_center;
-    u8 pin_right;
+    static constexpr u8 PIN_LEFT = PinL;
+    static constexpr u8 PIN_CENTER = PinC;
+    // static constexpr u8 PIN_RIGHT = 
 };
 
 struct Station {
-    StationConfig config;
+    // StationConfig config;
     u8 id;
 };
 

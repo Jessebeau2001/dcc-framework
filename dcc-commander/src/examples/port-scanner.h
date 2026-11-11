@@ -25,14 +25,18 @@ constexpr Station STATION_1 {
     .id = 1
 };
 
+u8 test = 8;
 
 #include <Arduino.h>
+
 
 void setup() {
     // No abstraction for this yet, just keep as is for simple example
     *(volatile u8*)DDRB_ADDR = 0x00;
 
     tracker.check_occupancy(STATION_1);
+
+    using t = DataHandle<test, 1>;
 }
 
 void loop() {
