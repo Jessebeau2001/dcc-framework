@@ -6,10 +6,10 @@
 
 using namespace types;
 
-struct Station;
+// struct Station;
 
 struct StationNode {
-    Station *station;
+    // Station *station;
 
     StationNode *next;
     StationNode *prev;
@@ -22,7 +22,7 @@ struct GraphStationMap {
 
 template <u8 Size>
 struct LinearStationMap {
-    Station stations[Size];
+    // Station stations[Size];
 };
 
 void set_next(StationNode &current, StationNode *append) {
@@ -57,25 +57,20 @@ struct StationConfig {
 };
 
 template <typename ConfigType>
-struct Station2 {
+struct Station {
     using Config = ConfigType;
 
     u8 id;
 };
 
-struct Station {
-    // StationConfig config;
-    u8 id;
-};
-
-
 
 enum StationOcupancy {
     EMPTY,
-    ARPOACH_LEFT,
+    LEFT,
     OCCUPIED,
-    APROACH_RIGHT
+    RIGHT
 };
+
 
 class StationTracker {
 private:
@@ -89,33 +84,20 @@ public:
         center_data(center_data),
         right_data(right_data) { }
 
-    StationOcupancy check_occupancy(const Station& station) const {
-        u8 mask = 1 << station.id;
-        if ((left_data & mask) != 0) {
-            return StationOcupancy::ARPOACH_LEFT;
-        } else if ((center_data & mask) != 0) {
-            return StationOcupancy::OCCUPIED;
-        } else if ((right_data & mask) != 0) {
-            return StationOcupancy::APROACH_RIGHT;
-        } else {
-            return StationOcupancy::EMPTY;
-        }
-    }
-
     template <typename ConfigType>
-    StationOcupancy check_occupancy2() const {
+    StationOcupancy check_occupancy() const {
         using View = typename ConfigType::View;
 
         if (View::Left::is_set(left_data)) {
-            return StationOcupancy::ARPOACH_LEFT;
+            return StationOcupancy::LEFT;
         } else if (View::Center::is_set(center_data)) {
             return StationOcupancy::OCCUPIED;
         } else if (View::Right::is_set(right_data)) {
-            return StationOcupancy::APROACH_RIGHT;
+            return StationOcupancy::RIGHT;
         } else {
             return StationOcupancy::EMPTY;
         }
 
-         return EMPTY;
+        return EMPTY;
     }
 };

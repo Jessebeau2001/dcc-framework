@@ -8,11 +8,13 @@
 #define PINB_ADDR 0x03
 #define DDRB_ADDR 0x04
 
-using Sensors = PortScanner<ReadonlyRegister<PINB_ADDR>>;
+using SensorsLeft   = PortScanner<ReadonlyRegister<PINB_ADDR>>;
+using SensorsCenter = PortScanner<ReadonlyRegister<PINB_ADDR>>;
+using SensorsRight  = PortScanner<ReadonlyRegister<PINB_ADDR>>;
 
-Sensors::State state_left = Sensors::State();
-Sensors::State state_center = Sensors::State();
-Sensors::State state_right = Sensors::State();
+auto state_left     = SensorsLeft::State();
+auto state_center   = SensorsCenter::State();
+auto state_right    = SensorsRight::State();
 
 
 StationTracker tracker = StationTracker(
@@ -21,14 +23,9 @@ StationTracker tracker = StationTracker(
     state_right.value
 );
 
-constexpr Station STATION_1 {
-    .id = 1
-};
+using Station1Config = StationConfig<1, 1, 1>;
 
-
-using Station2Config = StationConfig<1, 1, 1>;
-
-constexpr Station2<Station2Config> STATION_2 {
+constexpr Station<Station1Config> STATION_1 {
     .id = 1
 };
 
@@ -39,13 +36,26 @@ void setup() {
     // No abstraction for this yet, just keep as is for simple example
     *(volatile u8*)DDRB_ADDR = 0x00;
 
-    tracker.check_occupancy(STATION_1);
-    tracker.check_occupancy2<Station2Config>();
 }
 
 void loop() {
-    // Sensors::update(sensor_state_a);
-    // if (SensorView::is_set(sensor_state_a.value)) {
-    //     // Pin is flipped
-    // }
+    SensorsLeft::update(state_left);
+    SensorsCenter::update(state_center);
+    SensorsRight::update(state_right);
+
+    auto occupancy = tracker.check_occupancy<Station1Config>();
+    switch (occupancy) {
+    case StationOcupancy::LEFT:
+        Serial.println("Aproaching Left");
+        break;
+    case StationOcupancy::OCCUPIED:
+        Serial.println("At Center");
+        break;
+    case StationOcupancy::RIGHT:
+        Serial.println("Aproaching Right");
+        break;
+    case StationOcupancy::EMPTY:
+        Serial.println("No data");
+        break;
+    }
 }
