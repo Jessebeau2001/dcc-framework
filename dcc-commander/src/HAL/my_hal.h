@@ -4,49 +4,76 @@
 
 namespace HAL {
 
+constexpr uintptr_t SFR_OFFSET = 0x20;
+
+constexpr uintptr_t sfr_io8(uintptr_t io_addr) {
+    return io_addr + SFR_OFFSET;
+}
+
 #if defined(ARDUINO_AVR_UNO)
     // https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-7810-Automotive-Microcontrollers-ATmega328P_Datasheet.pdf
-    
-    // Digital IO Register Definitions (read state / write toggle)
-    using _PINB = Register<0x03>;
-    using _PINC = Register<0x06>;
-    using _PIND = Register<0x09>;
 
-    // Data Direction Register Definitions (read mode config / write mode config)
-    using _DDRB = Register<0x04>;
-    using _DDRC = Register<0x07>;
-    using _DDRD = Register<0x0A>;
-
-    // Data Register Definitions (read state config / write state config)
-    using _PORTB = Register<0x05>;
-    using _PORTC = Register<0x08>;
-    using _PORTD = Register<0x0B>;
+    #define HAS_GPIOB 1
+    #define HAS_GPIOC 1
+    #define HAS_GPIOD 1
 #elif defined(ARDUINO_AVR_MEGA2560)
-    // Digital IO Register Definitions (read state / write toggle)
-    using _PINA = Register<0x00>;
-    using _PINB = Register<0x03>;
-    using _PINC = Register<0x06>;
-    using _PIND = Register<0x09>;
-    using _PINE = Register<0x0C>;
-    using _PINF = Register<0x0F>;
-
-    // Data Direction Register Definitions (read mode config / write mode config)
-    using _DDRA = Register<0x01>;
-    using _DDRB = Register<0x04>;
-    using _DDRC = Register<0x07>;
-    using _DDRD = Register<0x0A>;
-    using _DDRE = Register<0x0D>;
-    using _DDRF = Register<0x10>;
-
-    // Data Register Definitions (read state config / write state config)
-    using _PORTA = Register<0x02>;
-    using _PORTB = Register<0x05>;
-    using _PORTC = Register<0x08>;
-    using _PORTD = Register<0x0B>;
-    using _PORTE = Register<0x0E>;
-    using _PORTF = Register<0x11>;
+    // https://ww1.microchip.com/downloads/aemDocuments/documents/OTH/ProductDocuments/DataSheets/ATmega640-1280-1281-2560-2561-Datasheet-DS40002211A.pdf
+    
+    #define HAS_GPIOA 1
+    #define HAS_GPIOB 1
+    #define HAS_GPIOC 1
+    #define HAS_GPIOD 1
+    #define HAS_GPIOE 1
+    #define HAS_GPIOF 1
 #else
-    #error "Unsuported/unconfigured board pinout"
+    #error "Unsuported/unconfigured board"
 #endif
+
+#if defined(HAS_GPIOA)
+    using PINA_  = Register<sfr_io8(0x00)>;
+    using DDRA_  = Register<sfr_io8(0x00 + 1)>;
+    using PORTA_ = Register<sfr_io8(0x00 + 2)>;
+#endif
+
+#if defined(HAS_GPIOB)
+    using PINB_  = Register<sfr_io8(0x03)>;
+    using DDRB_  = Register<sfr_io8(0x03 + 1)>;
+    using PORTB_ = Register<sfr_io8(0x03 + 2)>;
+#endif
+
+#if defined(HAS_GPIOC)
+    using PINC_  = Register<sfr_io8(0x06)>;
+    using DDRC_  = Register<sfr_io8(0x06 + 1)>;
+    using PORTC_ = Register<sfr_io8(0x06 + 2)>;
+#endif
+
+#if defined(HAS_GPIOD)
+    using PIND_  = Register<sfr_io8(0x09)>;
+    using DDRD_  = Register<sfr_io8(0x09 + 1)>;
+    using PORTD_ = Register<sfr_io8(0x09 + 2)>;
+#endif
+
+#if defined(HAS_GPIOE)
+    using PINE_  = Register<sfr_io8(0x0C)>;
+    using DDRE_  = Register<sfr_io8(0x0C + 1)>;
+    using PORTE_ = Register<sfr_io8(0x0C + 2)>;
+#endif
+
+#if defined(HAS_GPIOF)
+    using PINF_  = Register<sfr_io8(0x0F)>;
+    using DDRF_  = Register<sfr_io8(0x0F + 1)>;
+    using PORTF_ = Register<sfr_io8(0x0F + 2)>;
+#endif
+
+
+enum PortMode {
+    MODE_INPUT = 0,
+    MODE_OUTPUT = 1
+};
+
+template <typename Writable>
+constexpr void set_mode(PortMode mode) {
+    Writable::write(mode);
+}
 
 }; // namespace HAL
