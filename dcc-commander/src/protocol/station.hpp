@@ -39,20 +39,28 @@ void set_prev(StationNode &current, StationNode *append) {
     current.prev = append;
 }
 
-template <auto& Ref, u8 Pin>
-struct DataHandle {
-    using View = BitView<Pin, u8>;
+template <u8 PinL, u8 PinC, u8 PinR>
+struct StationView {
+    using Left                  = BitView<PinL>;
+    using Center                = BitView<PinC>;
+    using Right                 = BitView<PinR>;
 
-    static constexpr bool is_set() {
-        return View::is_set(Ref);
-    }
+    static constexpr u8 PIN_CENTER = PinC;
+    static constexpr u8 PIN_LEFT   = PinL;
+    static constexpr u8 PIN_RIGHT  = PinR;
 };
+
 
 template <u8 PinL, u8 PinC, u8 PinR>
 struct StationConfig {
-    static constexpr u8 PIN_LEFT = PinL;
-    static constexpr u8 PIN_CENTER = PinC;
-    // static constexpr u8 PIN_RIGHT = 
+    using View = StationView<PinL, PinC, PinR>;
+};
+
+template <typename ConfigType>
+struct Station2 {
+    using Config = ConfigType;
+
+    u8 id;
 };
 
 struct Station {
@@ -92,5 +100,22 @@ public:
         } else {
             return StationOcupancy::EMPTY;
         }
+    }
+
+    template <typename ConfigType>
+    StationOcupancy check_occupancy2() const {
+        using View = typename ConfigType::View;
+
+        if (View::Left::is_set(left_data)) {
+            return StationOcupancy::ARPOACH_LEFT;
+        } else if (View::Center::is_set(center_data)) {
+            return StationOcupancy::OCCUPIED;
+        } else if (View::Right::is_set(right_data)) {
+            return StationOcupancy::APROACH_RIGHT;
+        } else {
+            return StationOcupancy::EMPTY;
+        }
+
+         return EMPTY;
     }
 };

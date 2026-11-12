@@ -25,7 +25,12 @@ constexpr Station STATION_1 {
     .id = 1
 };
 
-u8 test = 8;
+
+using Station2Config = StationConfig<1, 1, 1>;
+
+constexpr Station2<Station2Config> STATION_2 {
+    .id = 1
+};
 
 #include <Arduino.h>
 
@@ -35,8 +40,7 @@ void setup() {
     *(volatile u8*)DDRB_ADDR = 0x00;
 
     tracker.check_occupancy(STATION_1);
-
-    using t = DataHandle<test, 1>;
+    tracker.check_occupancy2<Station2Config>();
 }
 
 void loop() {
