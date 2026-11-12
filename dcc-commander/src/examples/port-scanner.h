@@ -8,42 +8,44 @@
 #define PINB_ADDR 0x03
 #define DDRB_ADDR 0x04
 
-using SensorsLeft   = PortScanner<ReadonlyRegister<PINB_ADDR>>;
-using SensorsCenter = PortScanner<ReadonlyRegister<PINB_ADDR>>;
-using SensorsRight  = PortScanner<ReadonlyRegister<PINB_ADDR>>;
+#define PINC_ADDR 0x06
+#define DDRC_ADDR 0x07
 
-auto state_left     = SensorsLeft::State();
-auto state_center   = SensorsCenter::State();
-auto state_right    = SensorsRight::State();
+#define PIND_ADDR 0x09
+#define DDRD_ADDR 0x0A
 
+using _PINB = ReadonlyRegister<PINB_ADDR>;
+using _PINC = ReadonlyRegister<PINC_ADDR>;
+using _PIND = ReadonlyRegister<PIND_ADDR>;
 
-StationTracker tracker = StationTracker(
-    state_left.value,
-    state_center.value,
-    state_right.value
-);
+auto station_tracker = StationTracker<_PINB, _PINC, _PIND>();
 
-using Station1Config = StationConfig<1, 1, 1>;
+static constexpr StationPinConfig STATION1_PINOUT = StationPinConfig{
+    .pin_left = 1,
+    .pin_center = 1,
+    .pin_right = 1
+};
 
-constexpr Station<Station1Config> STATION_1 {
+Station my_station = Station{
+    .pins = STATION1_PINOUT,
     .id = 1
 };
 
 #include <Arduino.h>
 
+template <uintptr_t Address, typename T = u8>
+void set_reg(u8 config) {
+    *reinterpret_cast<volatile T*>(Address) = config;
+}
 
 void setup() {
-    // No abstraction for this yet, just keep as is for simple example
-    *(volatile u8*)DDRB_ADDR = 0x00;
-
+    set_reg<DDRB_ADDR>(0);
+    set_reg<DDRC_ADDR>(0);
+    set_reg<DDRD_ADDR>(0);
 }
 
 void loop() {
-    SensorsLeft::update(state_left);
-    SensorsCenter::update(state_center);
-    SensorsRight::update(state_right);
-
-    auto occupancy = tracker.check_occupancy<Station1Config>();
+    auto occupancy = station_tracker.check_occupancy(my_station);
     switch (occupancy) {
     case StationOcupancy::LEFT:
         Serial.println("Aproaching Left");

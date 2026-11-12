@@ -39,30 +39,18 @@ void set_prev(StationNode &current, StationNode *append) {
     current.prev = append;
 }
 
-template <u8 PinL, u8 PinC, u8 PinR>
-struct StationView {
-    using Left                  = BitView<PinL>;
-    using Center                = BitView<PinC>;
-    using Right                 = BitView<PinR>;
 
-    static constexpr u8 PIN_CENTER = PinC;
-    static constexpr u8 PIN_LEFT   = PinL;
-    static constexpr u8 PIN_RIGHT  = PinR;
+struct StationPinConfig {
+    const u8 pin_left;
+    const u8 pin_center;
+    const u8 pin_right;
 };
 
 
-template <u8 PinL, u8 PinC, u8 PinR>
-struct StationConfig {
-    using View = StationView<PinL, PinC, PinR>;
-};
-
-template <typename ConfigType>
 struct Station {
-    using Config = ConfigType;
-
-    u8 id;
+    const StationPinConfig pins;
+    const u8 id;
 };
-
 
 enum StationOcupancy {
     EMPTY,
@@ -72,32 +60,41 @@ enum StationOcupancy {
 };
 
 
+template <typename RegLeft, typename RegCenter, typename RegRight>
 class StationTracker {
 private:
-    const u8& left_data;
-    const u8& center_data;
-    const u8& right_data;
+    using PortLeft      = PortScanner<RegLeft>;
+    using PortCenter    = PortScanner<RegCenter>;
+    using PortRight     = PortScanner<RegRight>;
+
+    using LeftState     = typename PortLeft::State;
+    using CenterState   = typename PortCenter::State;
+    using RightState    = typename PortRight::State;
+
+    LeftState state_left        = LeftState();
+    CenterState state_center    = CenterState();
+    RightState state_right      = RightState();
 
 public:
-    StationTracker(const u8& left_data, const u8& center_data, const u8& right_data)
-      : left_data(left_data),
-        center_data(center_data),
-        right_data(right_data) { }
+    StationTracker() { };
 
-    template <typename ConfigType>
-    StationOcupancy check_occupancy() const {
-        using View = typename ConfigType::View;
 
-        if (View::Left::is_set(left_data)) {
+    inline void update() {
+        PortLeft::update(state_left);
+        PortCenter::update(state_center);
+        PortRight::update(state_right);
+    }
+
+
+    StationOcupancy check_occupancy(const Station& station) const {
+        if ((state_left.value & (1 << station.pins.pin_left)) != 0) {
             return StationOcupancy::LEFT;
-        } else if (View::Center::is_set(center_data)) {
+        } else if ((state_center.value & (1 << station.pins.pin_center)) != 0) {
             return StationOcupancy::OCCUPIED;
-        } else if (View::Right::is_set(right_data)) {
+        } else if ((state_right.value & (1 << station.pins.pin_right)) != 0) {
             return StationOcupancy::RIGHT;
         } else {
             return StationOcupancy::EMPTY;
         }
-
-        return EMPTY;
     }
 };
