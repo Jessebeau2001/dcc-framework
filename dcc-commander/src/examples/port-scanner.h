@@ -1,24 +1,13 @@
 #pragma once
 
-#include <common/reg/register_helper.h>
+#include <HAL/register.h>
 #include <common/reg/port_scanner.h>
 #include <protocol/station.hpp>
 #include <common/handle.h>
+#include <HAL/my_hal.h>
 
-#define PINB_ADDR 0x03
-#define DDRB_ADDR 0x04
 
-#define PINC_ADDR 0x06
-#define DDRC_ADDR 0x07
-
-#define PIND_ADDR 0x09
-#define DDRD_ADDR 0x0A
-
-using _PINB = ReadonlyRegister<PINB_ADDR>;
-using _PINC = ReadonlyRegister<PINC_ADDR>;
-using _PIND = ReadonlyRegister<PIND_ADDR>;
-
-auto station_tracker = StationTracker<_PINB, _PINC, _PIND>();
+auto station_tracker = StationTracker<HAL::_PINB, HAL::_PINC, HAL::_PIND>();
 
 static constexpr StationPinConfig STATION1_PINOUT = StationPinConfig{
     .pin_left = 1,
@@ -33,15 +22,10 @@ Station my_station = Station{
 
 #include <Arduino.h>
 
-template <uintptr_t Address, typename T = u8>
-void set_reg(u8 config) {
-    *reinterpret_cast<volatile T*>(Address) = config;
-}
-
 void setup() {
-    set_reg<DDRB_ADDR>(0);
-    set_reg<DDRC_ADDR>(0);
-    set_reg<DDRD_ADDR>(0);
+    HAL::_DDRB::write(0);
+    HAL::_DDRC::write(0);
+    HAL::_DDRD::write(0);
 }
 
 void loop() {

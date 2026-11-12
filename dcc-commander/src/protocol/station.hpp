@@ -1,7 +1,7 @@
 #pragma once
 
 #include <types.h>
-#include <common/reg/register_helper.h>
+#include <HAL/register.h>
 #include <common/handle.h>
 
 using namespace types;
