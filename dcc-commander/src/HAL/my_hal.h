@@ -25,6 +25,11 @@ constexpr uintptr_t sfr_io8(uintptr_t io_addr) {
     #define HAS_GPIOD 1
     #define HAS_GPIOE 1
     #define HAS_GPIOF 1
+    #define HAS_GPIOG 1
+    #define HAS_GPIOH 1
+    #define HAS_GPIOJ 1
+    #define HAS_GPIOK 1
+    #define HAS_GPIOL 1
 #else
     #error "Unsuported/unconfigured board"
 #endif
@@ -63,6 +68,36 @@ constexpr uintptr_t sfr_io8(uintptr_t io_addr) {
     using PINF_  = Register<sfr_io8(0x0F)>;
     using DDRF_  = Register<sfr_io8(0x0F + 1)>;
     using PORTF_ = Register<sfr_io8(0x0F + 2)>;
+#endif
+
+#if defined(HAS_GPIOG)
+    using PING_  = Register<sfr_io8(0x12)>;
+    using DDRG_  = Register<sfr_io8(0x12 + 1)>;
+    using PORTG_ = Register<sfr_io8(0x12 + 2)>;
+#endif
+
+#if defined(HAS_GPIOH)
+    using PIN_  = Register<0x102>;
+    using DDR_  = Register<0x102 + 1>;
+    using PORT_ = Register<0x102 + 2>;
+#endif
+
+#if defined(HAS_GPIOJ)
+    using PINJ_  = Register<0x103>;
+    using DDRJ_  = Register<0x103 + 1>;
+    using PORTJ_ = Register<0x103 + 2>;
+#endif
+
+#if defined(HAS_GPIOK)
+    using PINK_  = Register<0x106>;
+    using DDRK_  = Register<0x106 + 1>;
+    using PORTK_ = Register<0x106 + 2>;
+#endif
+
+#if defined(HAS_GPIOL)
+    using PINL_  = Register<109>;
+    using DDRL_  = Register<109 + 1>;
+    using PORTL_ = Register<109 + 2>;
 #endif
 
 
