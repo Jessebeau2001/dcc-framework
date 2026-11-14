@@ -3,6 +3,7 @@
 #include <types.h>
 #include <stdint.h>
 #include <common/handle.h>
+#include <concepts.h>
 
 using namespace types;
 
@@ -55,7 +56,12 @@ struct WriteonlyRegister : private Register<Address, T> {
 
 template <typename PinReg, typename DDRReg, typename PortReg>
 struct IOPort {
-    using ValueType = typename DDRReg::ValueType;
+    using ValueType = typename PinReg::ValueType;
+
+    static_assert(cpt::is_same_v<ValueType, typename DDRReg::ValueType> &&
+                  cpt::is_same_v<ValueType, typename PortReg::ValueType>,
+                  "Can only define port for types with same width");
+
     using Pin  = PinReg;
     using DDR  = DDRReg;
     using Port = PortReg;
