@@ -26,26 +26,26 @@ struct BitView {
     }
 };
 
-template<size_t Index, typename T = u8>
-struct BitHandle {
-    static_assert(Index >= 0, "Bit index cannot be negative");
-    static_assert(Index < (sizeof(T) * 8), "Bit Index is out of range for type");
-    
-    static constexpr T MASK = static_cast<T>(1) << Index;
 
-    template <typename Base>
+template<typename Base, size_t Index>
+struct BitHandle {
+    using BaseType = typename Base::ValueType;
+
+    static_assert(Index >= 0, "Bit index cannot be negative");
+    static_assert(Index < (sizeof(BaseType) * 8), "Bit Index is out of range for type");
+    
+    static constexpr BaseType MASK = static_cast<BaseType>(1) << Index;
+
     static constexpr bool read() {
         return (Base::read() & MASK) != 0;
     }
 
-    template <typename Base>
-    static constexpr void set() {
-        Base::write(Base::read() | MASK);
-    }
-
-    template <typename Base>
-    static constexpr void clear() {
-        Base::write(Base::read() & ~MASK);
+    static constexpr void write(bool value) {
+        if (value) {
+            Base::write(Base::read() | MASK);
+        } else {
+            Base::write(Base::read() & ~MASK);
+        }
     }
 };
 

@@ -112,7 +112,7 @@ constexpr uintptr_t sfr_io8(uintptr_t io_addr) {
 #endif
 
 template <typename Writable>
-constexpr void set_mode(PortMode mode) {
+constexpr void set_mode(IOMode mode) {
     Writable::write(mode);
 }
 

@@ -10,9 +10,10 @@ using RegType = unsigned char;
 
 namespace HAL {
 
-enum PortMode {
-    MODE_INPUT = 0,
-    MODE_OUTPUT = 1
+enum class IOMode {
+    Input,
+    Output,
+    InputPullup
 };
 
 } // namespace HAL
@@ -52,36 +53,48 @@ struct WriteonlyRegister : private Register<Address, T> {
     }
 };
 
-template <typename Pin, typename DDR, typename Port>
+template <typename PinReg, typename DDRReg, typename PortReg>
 struct IOPort {
-    using ValueType = typename DDR::ValueType;
-    using PinX  = Pin;
-    using DDRX  = DDR;
-    using PortX = Port;
+    using ValueType = typename DDRReg::ValueType;
+    using Pin  = PinReg;
+    using DDR  = DDRReg;
+    using Port = PortReg;
 };
 
 template <typename IO, size_t Index>
 struct IOPin {
     using ValueType = typename IO::ValueType;
-    using Handle = BitHandle<Index, ValueType>;
+    using Pin = BitHandle<typename IO::Pin, Index>;
+    using DDR = BitHandle<typename IO::DDR, Index>;
+    using Port = BitHandle<typename IO::Port, Index>;
 
-    static constexpr void set_mode(HAL::PortMode mode) {
-        if (mode == HAL::PortMode::MODE_INPUT) {
-            Handle::template set<typename IO::DDRX>();
-        } else {
-            Handle::template clear<typename IO::DDRX>();
-        }
+    static constexpr bool read() {
+        return Pin::read();
     }
 
-    static constexpr ValueType read() {
-        return Handle::template read<typename IO::PINX>();
-    }
-
-    static constexpr ValueType write(ValueType value) {
-        if (value > 1) {
-            Handle::template set<typename IO::PortX>();
-        } else {
-            Handle::template clear<typename IO::PortX>();
-        }
+    static constexpr void write(bool value) {
+        Port::write(value);
     }
 };
+
+template<typename>
+inline constexpr bool always_false_v = false;
+
+template<typename IO>
+constexpr void configure_io(HAL::IOMode mode) {
+    using ValueType = typename IO::ValueType;
+    constexpr ValueType HIGH = ~ValueType{0};
+    constexpr ValueType LOW = ValueType{0};
+
+    switch (mode) {
+    case HAL::IOMode::Input:
+        IO::DDR::write(HIGH);
+        break;
+    case HAL::IOMode::Output:
+        IO::DDR::write(LOW);
+        break;
+    case HAL::IOMode::InputPullup:
+        IO::DDR::write(LOW);    // Pin Input
+        IO::Port::write(HIGH);  // Input pullup on port
+    }
+}
