@@ -12,7 +12,7 @@ using RegType = unsigned char;
 template <uintptr_t Address, typename T = RegType>
 struct Register {
     using ValueType = T;
-    static constexpr uintptr_t address = Address;
+    static constexpr uintptr_t ADDRESS = Address;
 
     static inline T read() {
         return *reinterpret_cast<volatile T*>(Address);
@@ -46,17 +46,22 @@ struct WriteonlyRegister : private Register<Address, T> {
 template <typename IO, size_t Index>
 struct IOPin {
     using ValueType = bool;
-    using PIN = BitHandle<typename IO::PIN, Index>;
-    using DDR = BitHandle<typename IO::DDR, Index>;
-    using PORT = BitHandle<typename IO::PORT, Index>;
+
+    using PinReg = typename IO::PIN;
+    using DDRReg = typename IO::DDR;
+    using PortReg = typename IO::PORT;
+
+    using PIN = BitHandle<PinReg, Index>;
+    using DDR = BitHandle<DDRReg, Index>;
+    using PORT = BitHandle<PortReg, Index>;
 };
 
 template <typename PinReg, typename DDRReg, typename PortReg>
 struct IOPort {
     using ValueType = typename PinReg::ValueType;
 
-    static_assert(cpt::is_same_v<ValueType, typename DDRReg::ValueType> &&
-                  cpt::is_same_v<ValueType, typename PortReg::ValueType>,
+    static_assert(traits::is_same_v<ValueType, typename DDRReg::ValueType> &&
+                  traits::is_same_v<ValueType, typename PortReg::ValueType>,
                   "Can only define port for types with same width");
 
     using PIN  = PinReg;
