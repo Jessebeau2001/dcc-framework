@@ -39,16 +39,7 @@ void set_prev(StationNode &current, StationNode *append) {
     current.prev = append;
 }
 
-
-struct StationPinConfig {
-    const u8 pin_left;
-    const u8 pin_center;
-    const u8 pin_right;
-};
-
-
 struct Station {
-    const StationPinConfig pins;
     const u8 id;
 };
 
@@ -86,15 +77,15 @@ public:
     }
 
 
-    StationOcupancy check_occupancy(const Station& station) const {
-        if ((state_left.value & (1 << station.pins.pin_left)) != 0) {
-            return StationOcupancy::LEFT;
-        } else if ((state_center.value & (1 << station.pins.pin_center)) != 0) {
-            return StationOcupancy::OCCUPIED;
-        } else if ((state_right.value & (1 << station.pins.pin_right)) != 0) {
-            return StationOcupancy::RIGHT;
-        } else {
-            return StationOcupancy::EMPTY;
-        }
-    }
+    // StationOcupancy check_occupancy(const Station& station) const {
+    //     if ((state_left.value & (1 << station.pins.pin_left)) != 0) {
+    //         return StationOcupancy::LEFT;
+    //     } else if ((state_center.value & (1 << station.pins.pin_center)) != 0) {
+    //         return StationOcupancy::OCCUPIED;
+    //     } else if ((state_right.value & (1 << station.pins.pin_right)) != 0) {
+    //         return StationOcupancy::RIGHT;
+    //     } else {
+    //         return StationOcupancy::EMPTY;
+    //     }
+    // }
 };

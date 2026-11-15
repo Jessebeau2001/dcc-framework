@@ -9,17 +9,6 @@ using namespace types;
 
 using RegType = unsigned char;
 
-namespace HAL {
-
-enum class IOMode {
-    Input,
-    Output,
-    InputPullup
-};
-
-} // namespace HAL
-
-
 template <uintptr_t Address, typename T = RegType>
 struct Register {
     using ValueType = T;
@@ -54,6 +43,14 @@ struct WriteonlyRegister : private Register<Address, T> {
     }
 };
 
+template <typename IO, size_t Index>
+struct IOPin {
+    using ValueType = bool;
+    using PIN = BitHandle<typename IO::PIN, Index>;
+    using DDR = BitHandle<typename IO::DDR, Index>;
+    using PORT = BitHandle<typename IO::PORT, Index>;
+};
+
 template <typename PinReg, typename DDRReg, typename PortReg>
 struct IOPort {
     using ValueType = typename PinReg::ValueType;
@@ -62,32 +59,34 @@ struct IOPort {
                   cpt::is_same_v<ValueType, typename PortReg::ValueType>,
                   "Can only define port for types with same width");
 
-    using Pin  = PinReg;
+    using PIN  = PinReg;
     using DDR  = DDRReg;
-    using Port = PortReg;
+    using PORT = PortReg;
+
+    template<u8 N>
+    using Pin = IOPin<IOPort, N>;
 };
 
-template <typename IO, size_t Index>
-struct IOPin {
-    using ValueType = typename IO::ValueType;
-    using Pin = BitHandle<typename IO::Pin, Index>;
-    using DDR = BitHandle<typename IO::DDR, Index>;
-    using Port = BitHandle<typename IO::Port, Index>;
+namespace HAL {
 
-    static constexpr bool read() {
-        return Pin::read();
-    }
-
-    static constexpr void write(bool value) {
-        Port::write(value);
-    }
+enum class IOMode {
+    Input,
+    Output,
+    InputPullup
 };
-
-template<typename>
-inline constexpr bool always_false_v = false;
 
 template<typename IO>
-constexpr void configure_io(HAL::IOMode mode) {
+constexpr void io_write(typename IO::ValueType value) {
+    IO::Port::write(value);
+}
+
+template<typename IO>
+constexpr typename IO::ValueType io_read() {
+    return IO::Pin::read();
+}
+
+template<typename IO>
+constexpr void io_configure(HAL::IOMode mode) {
     using ValueType = typename IO::ValueType;
     constexpr ValueType HIGH = ~ValueType{0};
     constexpr ValueType LOW = ValueType{0};
@@ -101,6 +100,8 @@ constexpr void configure_io(HAL::IOMode mode) {
         break;
     case HAL::IOMode::InputPullup:
         IO::DDR::write(LOW);    // Pin Input
-        IO::Port::write(HIGH);  // Input pullup on port
+        IO::PORT::write(HIGH);  // Input pullup on port
     }
 }
+
+} // namespace HAL
