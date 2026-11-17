@@ -8,17 +8,19 @@
 
 #include <Arduino.h>
 
-using StationSensors = StationPortDebouncer<
+using StationSensors = train::StationPortDebouncer<
     HAL::GPIO_B::PIN,
     HAL::GPIO_C::PIN,
     HAL::GPIO_D::PIN
 >;
 
 auto station_debouncer = StationSensors();
-auto station_1 = Station{};
+auto station_manager = train::StationManager();
+
+const auto& station_1 = *station_manager.create_station(station_debouncer);
 
 void setup() {
-    setup_station(station_1, 1u, station_debouncer, 0u);
+    
     // link_config(station_1.config, station_debouncer, 1, 1, 1);
 
     // using MyPin = HAL::GPIO_C::Pin<0>;
@@ -33,4 +35,7 @@ void setup() {
 
 void loop() {
     station_debouncer.update();
+    if (train::check_occupancy(station_1) == train::StationOcupancy::OCCUPIED) {
+
+    }
 }

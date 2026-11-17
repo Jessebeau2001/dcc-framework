@@ -18,12 +18,12 @@ template <typename T>
 struct DataView {
     using ValueType = T;
 
-    T* addr;
+    T const* addr;
     T mask;
 };
 
 template <typename View>
-inline bool read(const View& view) {
+inline bool read_view(const View& view) {
     return (*view.addr & view.mask) != 0;
 }
 

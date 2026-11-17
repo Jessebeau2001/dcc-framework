@@ -6,7 +6,7 @@
 
 using namespace types;
 
-// struct Station;
+namespace train {
 
 struct StationNode {
     // Station *station;
@@ -53,31 +53,6 @@ struct Station {
     u8 id;
 };
 
-enum StationOcupancy {
-    EMPTY,
-    LEFT,
-    OCCUPIED,
-    RIGHT
-};
-
-void set_config_handle(SensorHandle& handle, u8* value_ptr, u8 i) {
-    handle.addr = value_ptr;
-    handle.mask = static_cast<u8>(1u << i);
-}
-
-template <typename Sensors>
-void link_config(StationConfig& config, Sensors& sensors, u8 left, u8 center, u8 right) {
-    set_config_handle(config.sensor_left,   &sensors.state_left.value,   left);
-    set_config_handle(config.sensor_center, &sensors.state_center.value, center);
-    set_config_handle(config.sensor_right,  &sensors.state_right.value,  right);
-}
-
-template <typename Sensors>
-void setup_station(Station& station, u8 id, Sensors& sensors, u8 sensor_shift) {
-    station.id = id;
-    link_config(station.config, sensors, sensor_shift, sensor_shift, sensor_shift);
-}
-
 template <typename RegLeft, typename RegCenter, typename RegRight>
 struct StationPortDebouncer {
     using PortLeft              = PortScanner<RegLeft>;
@@ -99,20 +74,62 @@ struct StationPortDebouncer {
     }
 };
 
-class StationTracker {
-private:
-public:
-    StationTracker() { };
-
-    // StationOcupancy check_occupancy(const Station& station) const {
-    //     if ((state_left.value & (1 << station.pins.pin_left)) != 0) {
-    //         return StationOcupancy::LEFT;
-    //     } else if ((state_center.value & (1 << station.pins.pin_center)) != 0) {
-    //         return StationOcupancy::OCCUPIED;
-    //     } else if ((state_right.value & (1 << station.pins.pin_right)) != 0) {
-    //         return StationOcupancy::RIGHT;
-    //     } else {
-    //         return StationOcupancy::EMPTY;
-    //     }
-    // }
+enum StationOcupancy {
+    EMPTY,
+    LEFT,
+    OCCUPIED,
+    RIGHT
 };
+
+void set_config_handle(SensorHandle& handle, u8 const* value_ptr, u8 i) {
+    handle.addr = value_ptr;
+    handle.mask = static_cast<u8>(1u << i);
+}
+
+template <typename SensorStates>
+void link_config(StationConfig& config, const SensorStates& sensors, u8 left, u8 center, u8 right) {
+    set_config_handle(config.sensor_left,   &sensors.state_left.value,   left);
+    set_config_handle(config.sensor_center, &sensors.state_center.value, center);
+    set_config_handle(config.sensor_right,  &sensors.state_right.value,  right);
+}
+
+class StationManager {
+    static constexpr u8 MAX_STATIONS = 8u; // Essentially the register size
+
+    Station stations[MAX_STATIONS];
+    u8 station_count = 0;
+
+public:
+    template <typename SensorStates>
+    Station const* create_station(const SensorStates& sensors) {
+        if (station_count >= MAX_STATIONS)
+            return nullptr;
+        
+        u8 index = station_count;
+        u8 id = index;
+        u8 shift = index;
+        
+        Station& station = stations[index];
+
+        station.id = id;
+        link_config(station.config, sensors, shift, shift, shift);
+
+        station_count += 1;
+        return &stations[index];
+    };
+};
+
+
+StationOcupancy check_occupancy(const Station& station) {
+    if (HAL::read_view(station.config.sensor_left) != 0) {
+        return StationOcupancy::LEFT;
+    } else if (HAL::read_view(station.config.sensor_center) != 0) {
+        return StationOcupancy::OCCUPIED;
+    } else if (HAL::read_view(station.config.sensor_right) != 0) {
+        return StationOcupancy::RIGHT;
+    } else {
+        return StationOcupancy::EMPTY;
+    }
+}
+
+} // namespace train
