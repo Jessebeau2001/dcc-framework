@@ -23,7 +23,7 @@ struct DataView {
 };
 
 template <typename View>
-inline bool read_view(const View& view) {
+inline bool read_bit(const View& view) {
     return (*view.addr & view.mask) != 0;
 }
 
@@ -35,12 +35,6 @@ constexpr DynamicPin<typename Pin::PORT::BaseType> make_dynamic() {
         .addr = reinterpret_cast<volatile T*>(Pin::PortReg::ADDRESS),
         .mask = Pin::PORT::MASK
     };
-}
-
-
-template <typename T>
-void io_write(DynamicPin<T> pin, u8 value) {
-    // something
 }
 
 } // namespace HAL

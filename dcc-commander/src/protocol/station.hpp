@@ -8,36 +8,115 @@ using namespace types;
 
 namespace train {
 
-struct StationNode {
-    // Station *station;
+// useless shit
+template <typename T>
+struct LinkedList {
+    struct Node {
+        T data;
 
-    StationNode *next;
-    StationNode *prev;
+        Node *next;
+        Node *prev;
+
+        void set_next(Node *append) {
+            if (append != nullptr)
+                append->prev = this;
+            this->next = append;
+        }
+
+        void set_prev(Node *append) {
+            if (append != nullptr)
+                append->next = this;
+            this->prev = append;
+        }
+
+        bool look_ahead(T search) const {
+            const Node* current = this;
+            while (current != nullptr) {
+                if (current->data == search)
+                    return true;
+                current = current->next;
+            }
+            return false;
+        }
+    };
+
+    Node *head;
+    Node *tail;
 };
 
-struct GraphStationMap {
-    StationNode *head;
-    StationNode *tail;
+enum class Direction : u8 {
+    FORWARD   =  0,
+    BACKWARD  =  1,
+    CURRENT   =  2,
+    NOT_FOUND =  3
 };
 
-template <u8 Size>
-struct LinearStationMap {
-    // Station stations[Size];
-};
+template <typename T, typename Flag>
+struct Container {
+    T data;
+    u8 header;
 
-void set_next(StationNode &current, StationNode *append) {
-    if (append != nullptr) {
-        append->prev = &current;
+    inline bool is_set(Flag flag) const {
+        return (header & static_cast<u8>(flag));
     }
-    current.next = append;
-}
 
-void set_prev(StationNode &current, StationNode *append) {
-    if (append != nullptr) {
-        append->next = &current;
+    inline void set(Flag flag) {
+        header |= static_cast<u8>(flag);
     }
-    current.prev = append;
-}
+
+    inline void clear(Flag flag) {
+        header &= ~static_cast<u8>(flag);
+    }
+};
+
+template <typename T, u8 Size = 8>
+class StationMap {
+public:
+    enum class Flag : u8 {
+        IN_USE    = 0b10000000
+    };
+
+private:
+    static constexpr u8 SIZE = Size;
+    Container<T, Flag> data[SIZE];
+
+public:
+    inline void put(u8 index, T element) {
+        data[index] = Container{
+            .data = element,
+            .header = Flag::IN_USE
+        };
+    }
+
+    i16 index_of(T element) const {
+        for (u8 i = 0; i < SIZE; i++) {
+            Container<T, Flag>& current = data[i];
+            if (current.is_set(Flag::IN_USE) && current.data == element)
+                return i;
+        }
+        return -1;
+    }
+
+    Direction search(T from, T to) const {
+        auto from_idx = index_of(from);
+        if (from_idx < 0)
+            return Direction::NOT_FOUND;
+
+        auto to_idx = index_of(to);
+        if (to_idx < 0)
+            return Direction::NOT_FOUND;
+
+        if (from_idx == to_idx) {
+            return Direction::CURRENT;
+        } else if (from_idx < to_idx) {
+            return Direction::FORWARD;
+        } else {
+            return Direction::BACKWARD;
+        }
+    }
+};
+
+
 
 // This system is kinda purpose build for 8 bit wide registers so might aswell hard lock the type here
 using SensorHandle = HAL::DataView<u8>;
@@ -93,7 +172,7 @@ void link_config(StationConfig& config, const SensorStates& sensors, u8 left, u8
     set_config_handle(config.sensor_right,  &sensors.state_right.value,  right);
 }
 
-class StationManager {
+class StationPool {
     static constexpr u8 MAX_STATIONS = 8u; // Essentially the register size
 
     Station stations[MAX_STATIONS];
@@ -101,13 +180,13 @@ class StationManager {
 
 public:
     template <typename SensorStates>
-    Station const* create_station(const SensorStates& sensors) {
+    Station const* create_station(const SensorStates& sensors, u8 sensor_shift) {
         if (station_count >= MAX_STATIONS)
             return nullptr;
         
-        u8 index = station_count;
-        u8 id = index;
-        u8 shift = index;
+        u8 index = station_count;   // Workable index is current count
+        u8 id = index;              // id's 0-7, exactly the same as storage index
+        u8 shift = sensor_shift;    // Sensor shift can be picked by the caller
         
         Station& station = stations[index];
 
@@ -121,11 +200,11 @@ public:
 
 
 StationOcupancy check_occupancy(const Station& station) {
-    if (HAL::read_view(station.config.sensor_left) != 0) {
+    if (HAL::read_bit(station.config.sensor_left) != 0) {
         return StationOcupancy::LEFT;
-    } else if (HAL::read_view(station.config.sensor_center) != 0) {
+    } else if (HAL::read_bit(station.config.sensor_center) != 0) {
         return StationOcupancy::OCCUPIED;
-    } else if (HAL::read_view(station.config.sensor_right) != 0) {
+    } else if (HAL::read_bit(station.config.sensor_right) != 0) {
         return StationOcupancy::RIGHT;
     } else {
         return StationOcupancy::EMPTY;
