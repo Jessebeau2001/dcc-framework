@@ -82,12 +82,12 @@ enum class IOMode {
 
 template<typename IO>
 constexpr void io_write(typename IO::ValueType value) {
-    IO::Port::write(value);
+    IO::PORT::write(value);
 }
 
 template<typename IO>
 constexpr typename IO::ValueType io_read() {
-    return IO::Pin::read();
+    return IO::PIN::read();
 }
 
 template<typename IO>
@@ -98,14 +98,15 @@ constexpr void io_configure(HAL::IOMode mode) {
 
     switch (mode) {
     case HAL::IOMode::Input:
-        IO::DDR::write(HIGH);
+        IO::DDR::write(LOW);    // Pin Input
+        IO::PORT::write(LOW);   // Pullup disabled
         break;
     case HAL::IOMode::Output:
-        IO::DDR::write(LOW);
+        IO::DDR::write(HIGH);   // Pin Output
         break;
     case HAL::IOMode::InputPullup:
         IO::DDR::write(LOW);    // Pin Input
-        IO::PORT::write(HIGH);  // Input pullup on port
+        IO::PORT::write(HIGH);  // Pullup enabled
     }
 }
 

@@ -20,6 +20,8 @@ auto station_manager = train::StationManager();
 const auto& station_1 = *station_manager.create_station(station_debouncer);
 
 void setup() {
+    HAL::io_configure<HAL::GPIO_C>(HAL::IOMode::InputPullup);
+    HAL::io_configure<HAL::LED_ONBOARD>(HAL::IOMode::Output);
     
     // link_config(station_1.config, station_debouncer, 1, 1, 1);
 
@@ -36,6 +38,8 @@ void setup() {
 void loop() {
     station_debouncer.update();
     if (train::check_occupancy(station_1) == train::StationOcupancy::OCCUPIED) {
-
+        HAL::io_write<HAL::LED_ONBOARD>(1);
+    } else {
+        HAL::io_write<HAL::LED_ONBOARD>(0);
     }
 }
