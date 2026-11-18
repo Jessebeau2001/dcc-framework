@@ -3,46 +3,11 @@
 #include <types.h>
 #include <HAL/dynamic.h>
 #include <common/handle.h>
+#include <common/container.h>
 
 using namespace types;
 
 namespace train {
-
-// useless shit
-template <typename T>
-struct LinkedList {
-    struct Node {
-        T data;
-
-        Node *next;
-        Node *prev;
-
-        void set_next(Node *append) {
-            if (append != nullptr)
-                append->prev = this;
-            this->next = append;
-        }
-
-        void set_prev(Node *append) {
-            if (append != nullptr)
-                append->next = this;
-            this->prev = append;
-        }
-
-        bool look_ahead(T search) const {
-            const Node* current = this;
-            while (current != nullptr) {
-                if (current->data == search)
-                    return true;
-                current = current->next;
-            }
-            return false;
-        }
-    };
-
-    Node *head;
-    Node *tail;
-};
 
 enum class Direction : u8 {
     FORWARD   =  0,
@@ -51,47 +16,21 @@ enum class Direction : u8 {
     NOT_FOUND =  3
 };
 
-template <typename T, typename Flag>
-struct Container {
-    T data;
-    u8 header;
-
-    inline bool is_set(Flag flag) const {
-        return (header & static_cast<u8>(flag));
-    }
-
-    inline void set(Flag flag) {
-        header |= static_cast<u8>(flag);
-    }
-
-    inline void clear(Flag flag) {
-        header &= ~static_cast<u8>(flag);
-    }
-};
-
 template <typename T, u8 Size = 8>
 class StationMap {
-public:
-    enum class Flag : u8 {
-        IN_USE    = 0b10000000
-    };
-
-private:
     static constexpr u8 SIZE = Size;
-    Container<T, Flag> data[SIZE];
+    T data[SIZE];
+    u8 current = 0;
 
 public:
-    inline void put(u8 index, T element) {
-        data[index] = Container{
-            .data = element,
-            .header = Flag::IN_USE
-        };
+    // Simple sequential add
+    inline void add(T element) {
+        data[current++] = element;
     }
 
     i16 index_of(T element) const {
         for (u8 i = 0; i < SIZE; i++) {
-            Container<T, Flag>& current = data[i];
-            if (current.is_set(Flag::IN_USE) && current.data == element)
+            if (data[i] == element)
                 return i;
         }
         return -1;
@@ -115,7 +54,6 @@ public:
         }
     }
 };
-
 
 
 // This system is kinda purpose build for 8 bit wide registers so might aswell hard lock the type here
