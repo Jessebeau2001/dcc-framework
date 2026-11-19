@@ -51,47 +51,21 @@ enum class Direction : u8 {
     NOT_FOUND =  3
 };
 
-template <typename T, typename Flag>
-struct Container {
-    T data;
-    u8 header;
-
-    inline bool is_set(Flag flag) const {
-        return (header & static_cast<u8>(flag));
-    }
-
-    inline void set(Flag flag) {
-        header |= static_cast<u8>(flag);
-    }
-
-    inline void clear(Flag flag) {
-        header &= ~static_cast<u8>(flag);
-    }
-};
-
-template <typename T, u8 Size = 8>
-class StationMap {
-public:
-    enum class Flag : u8 {
-        IN_USE    = 0b10000000
-    };
-
-private:
+template <typename T, u8 Size>
+class LinearStationMap {
     static constexpr u8 SIZE = Size;
-    Container<T, Flag> data[SIZE];
+    T data[SIZE];
 
 public:
-    inline void put(u8 index, T element) {
-        data[index] = Container{
-            .data = element,
-            .header = Flag::IN_USE
-        };
+    constexpr LinearStationMap(const T (&init)[Size]) : data{} {
+        for (u8 i = 0; i < SIZE; ++i) {
+            data[i] = init[i];
+        }
     }
 
     i16 index_of(T element) const {
         for (u8 i = 0; i < SIZE; i++) {
-            Container<T, Flag>& current = data[i];
-            if (current.is_set(Flag::IN_USE) && current.data == element)
+            if (data[i] == element)
                 return i;
         }
         return -1;
@@ -134,22 +108,22 @@ struct Station {
 
 template <typename RegLeft, typename RegCenter, typename RegRight>
 struct StationPortDebouncer {
-    using PortLeft              = PortScanner<RegLeft>;
-    using PortCenter            = PortScanner<RegCenter>;
-    using PortRight             = PortScanner<RegRight>;
+    using ScanLeft              = PortScanner<RegLeft>;
+    using ScanCenter            = PortScanner<RegCenter>;
+    using ScanRight             = PortScanner<RegRight>;
 
-    using LeftState             = typename PortLeft::State;
-    using CenterState           = typename PortCenter::State;
-    using RightState            = typename PortRight::State;
+    using LeftState             = typename ScanLeft::State;
+    using CenterState           = typename ScanCenter::State;
+    using RightState            = typename ScanRight::State;
 
     LeftState   state_left      = LeftState();
     CenterState state_center    = CenterState();
     RightState  state_right     = RightState();
 
     inline void update() {
-        PortLeft::update(state_left);
-        PortCenter::update(state_center);
-        PortRight::update(state_right);
+        ScanLeft::update(state_left);
+        ScanCenter::update(state_center);
+        ScanRight::update(state_right);
     }
 };
 

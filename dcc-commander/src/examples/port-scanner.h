@@ -23,8 +23,21 @@ const auto station_5 = station_pool.create_station(station_debouncer, 5);
 const auto station_6 = station_pool.create_station(station_debouncer, 6);
 const auto station_7 = station_pool.create_station(station_debouncer, 7);
 
+const auto station_map = train::LinearStationMap({
+    station_0->id,
+    station_1->id,
+    station_2->id,
+    station_3->id,
+    station_4->id,
+    station_5->id,
+    station_6->id,
+    station_7->id
+});
+
 void setup() {
-    HAL::io_configure<HAL::GPIO_C>(HAL::IOMode::InputPullup);
+    HAL::io_configure<HAL::GPIO_B>(HAL::IOMode::Input);
+    HAL::io_configure<HAL::GPIO_C>(HAL::IOMode::Input);
+    HAL::io_configure<HAL::GPIO_D>(HAL::IOMode::Input);
     HAL::io_configure<HAL::LED_ONBOARD>(HAL::IOMode::Output);
 }
 
