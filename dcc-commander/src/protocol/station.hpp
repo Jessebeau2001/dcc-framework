@@ -3,46 +3,11 @@
 #include <types.h>
 #include <HAL/dynamic.h>
 #include <common/handle.h>
+#include <common/container.h>
 
 using namespace types;
 
 namespace train {
-
-// useless shit
-template <typename T>
-struct LinkedList {
-    struct Node {
-        T data;
-
-        Node *next;
-        Node *prev;
-
-        void set_next(Node *append) {
-            if (append != nullptr)
-                append->prev = this;
-            this->next = append;
-        }
-
-        void set_prev(Node *append) {
-            if (append != nullptr)
-                append->next = this;
-            this->prev = append;
-        }
-
-        bool look_ahead(T search) const {
-            const Node* current = this;
-            while (current != nullptr) {
-                if (current->data == search)
-                    return true;
-                current = current->next;
-            }
-            return false;
-        }
-    };
-
-    Node *head;
-    Node *tail;
-};
 
 enum class Direction : u8 {
     FORWARD   =  0,
@@ -65,6 +30,7 @@ public:
 
     i16 index_of(T element) const {
         for (u8 i = 0; i < SIZE; i++) {
+            if (data[i] == element)
             if (data[i] == element)
                 return i;
         }
@@ -89,7 +55,6 @@ public:
         }
     }
 };
-
 
 
 // This system is kinda purpose build for 8 bit wide registers so might aswell hard lock the type here
