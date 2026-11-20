@@ -1,49 +1,30 @@
 # DCC Commander
 ----
 
-This is a simple framework to control model trains with the dcc protocol.
+This is a framework to control model trains over the dcc protocol.
 This implementation focusses on simplicity and flexibillity.
 
 ## Overview: Layers
 
-```plantuml
-@startuml
-top to bottom direction
-skinparam defaultTextAlignment center
+```mermaid
+classDiagram
+    class DccController {
+        Tracks train states and makes command decisions based on what trains should do when.
+    }
 
-rectangle DccController [
-  **DccController**
-  ----
-  Tracks train states and makes
-  command decisions based on what trains should do when.
-]
+    class DccScheduler {
+        Manages packet refresh rate, what packets to send when, and injects idle packets when required.
+    }
 
-rectangle DccScheduler [
-  **DccScheduler**
-  ----
-  Manages packet refresh rate,
-  what packets to send when
-  and injects idle packets when required.
-]
+    class DccSerializer {
+        Converts a packet to raw bits and does its checksumming. Primary concern is the framing of the data.
+    }
 
-rectangle DccSerializer [
-  **DccSerializer**
-  ----
-  Converts a packet to raw bits and does 
-  its checksumming.
-  Primary concern is the framing of the data.
-]
+    class BitBanger {
+        Queues up bits to write at specific intervals. Concerns itself with timings: what to write when, down to the microsecond.
+    }
 
-rectangle BitBanger [
-  **BitBanger**
-  ----
-  Queues up bits to write at specific interval.
-  Concerns itself with timings: what to write
-  when down the the microsecond.
-]
-
-DccController-->DccScheduler
-DccScheduler-->DccSerializer
-DccSerializer-->BitBanger
-@enduml
+    DccController ..> DccScheduler : uses
+    DccScheduler ..> DccSerializer : uses
+    DccSerializer ..> BitBanger : uses
 ```
