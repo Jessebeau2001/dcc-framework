@@ -13,7 +13,7 @@ using dcc::SpeedStep;
 using dcc::Direction;
 using dcc::DccScheduler;
 
-// auto scheduler = DccScheduler<bitbang::Writer>();
+auto scheduler = DccScheduler<bitbang::Writer>();
 
 uint32_t previous_time = 0; 
 uint16_t delay_ms = 1000;
@@ -42,12 +42,12 @@ void update_scheduling() {
 
 	u8 addr = 55 + (10 * num_actions);
 
-	// if (reverse == 0) {
-	// 	cmd.address = addr;
-	// 	scheduler.schedule(cmd);
-	// } else {
-	// 	scheduler.remove(addr);
-	// }
+	if (reverse == 0) {
+		cmd.address = addr;
+		scheduler.schedule(cmd);
+	} else {
+		scheduler.remove(addr);
+	}
 	
 	num_actions += 1;
 	if (num_actions > 4) {
@@ -72,7 +72,5 @@ void loop() {
 		update_scheduling();
 	}
 
-	bitbang::Writer::write_bit(1);
-
-	// scheduler.update();
+	scheduler.update();
 }
