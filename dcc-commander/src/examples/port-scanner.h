@@ -1,10 +1,9 @@
 #pragma once
 
-#include <HAL/register.h>
 #include <common/reg/port_scanner.h>
+#include <hal/core/dynamic.h>
 #include <dcc/station.hpp>
-#include <HAL/my_hal.h>
-#include <HAL/dynamic.h>
+#include <hal/board.h>
 
 #include <Arduino.h>
 

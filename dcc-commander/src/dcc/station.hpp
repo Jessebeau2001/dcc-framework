@@ -1,7 +1,6 @@
 #pragma once
 
 #include <types.h>
-#include <HAL/dynamic.h>
 #include <common/handle.h>
 #include <common/container.h>
 

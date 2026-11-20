@@ -1,12 +1,14 @@
 #pragma once
 
-#include <types.h>
 #include <stdint.h>
-#include <common/handle.h>
+#include <types.h>
 #include <concepts.h>
+#include <common/handle.h>
 
+
+namespace HAL {
+    
 using namespace types;
-
 using RegType = unsigned char;
 
 template <uintptr_t Address, typename T = RegType>
@@ -72,13 +74,18 @@ struct IOPort {
     using Pin = IOPin<IOPort, N>;
 };
 
-namespace HAL {
-
 enum class IOMode {
     Input,
     Output,
     InputPullup
 };
+
+template <uintptr_t Address>
+using GPIO = IOPort<
+    Register<Address>,
+    Register<Address + 1>,
+    Register<Address + 2>
+>;
 
 template<typename IO>
 constexpr void io_write(typename IO::ValueType value) {
