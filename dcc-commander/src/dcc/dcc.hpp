@@ -1,8 +1,8 @@
 #pragma once
 
 #include <types.h>
+#include <dcc/types.h>
 #include <HardwareSerial.h>
-#include <protocol/dcc_def.h>
 #include <common/command_map.hpp>
 
 /*  The DCC Pakcet Format

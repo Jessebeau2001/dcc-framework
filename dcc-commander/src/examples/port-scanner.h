@@ -2,7 +2,7 @@
 
 #include <HAL/register.h>
 #include <common/reg/port_scanner.h>
-#include <protocol/station.hpp>
+#include <dcc/station.hpp>
 #include <HAL/my_hal.h>
 #include <HAL/dynamic.h>
 
