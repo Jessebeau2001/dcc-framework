@@ -81,7 +81,7 @@ using namespace detail;
 void begin() {
     cli();							// Disable global interrupts during setup
 
-    tx::setup();
+    BangPin::configure(HAL::IOMode::Output);
 
     TCCR1A = 0;						// Reset Timer 1 Registers
     TCCR1B = 0;
@@ -131,13 +131,13 @@ ISR(TIMER1_COMPA_vect) {
 
     switch (tx_state) {
     case TxState::RISE:
-        bitbang::tx::flip();
+       HAL::io_flip<bitbang::BangPin>();
         timer_set_compare();
         tx_state = TxState::FALL;
         break;
 
     case TxState::FALL:
-        bitbang::tx::flip();
+        HAL::io_flip<bitbang::BangPin>();
 
         if (tx_buf.is_bit_available_for_read()) {
             current_bit = tx_buf.pop_bit();;
@@ -149,7 +149,7 @@ ISR(TIMER1_COMPA_vect) {
         break;
 
     case TxState::EXIT:
-        bitbang::tx::flip();
+        HAL::io_flip<bitbang::BangPin>();
         timer_stop();
         break;
     }

@@ -1,9 +1,8 @@
 #pragma once
 
-#include <Arduino.h>
 #include <types.h>
 #include <HAL/bitbang.hpp>
-#include <protocol/dcc.hpp>
+#include <dcc/dcc.hpp>
 
 using namespace types;
 
@@ -14,7 +13,7 @@ using dcc::SpeedStep;
 using dcc::Direction;
 using dcc::DccScheduler;
 
-auto scheduler = DccScheduler<bitbang::Writer>();
+// auto scheduler = DccScheduler<bitbang::Writer>();
 
 uint32_t previous_time = 0; 
 uint16_t delay_ms = 1000;
@@ -43,12 +42,12 @@ void update_scheduling() {
 
 	u8 addr = 55 + (10 * num_actions);
 
-	if (reverse == 0) {
-		cmd.address = addr;
-		scheduler.schedule(cmd);
-	} else {
-		scheduler.remove(addr);
-	}
+	// if (reverse == 0) {
+	// 	cmd.address = addr;
+	// 	scheduler.schedule(cmd);
+	// } else {
+	// 	scheduler.remove(addr);
+	// }
 	
 	num_actions += 1;
 	if (num_actions > 4) {
@@ -57,6 +56,8 @@ void update_scheduling() {
 		rest = 8;
 	}
 }
+
+#include <Arduino.h>
 
 void setup() {
 	Serial.begin(9600);
@@ -71,5 +72,7 @@ void loop() {
 		update_scheduling();
 	}
 
-	scheduler.update();
+	bitbang::Writer::write_bit(1);
+
+	// scheduler.update();
 }

@@ -17,6 +17,8 @@
 */
 
 namespace dcc {
+    using namespace types;
+    
     static constexpr u8 DCC_MAX_PACKET_SIZE = 6U; // 44 bits / 8 = 5.5 bytes = ~6 bytes
 
     template<typename Writer>
