@@ -3,7 +3,7 @@
 #include <types.h>
 #include <dcc/types.h>
 #include <HardwareSerial.h>
-#include <common/command_map.hpp>
+#include <dcc/command_map.hpp>
 
 /*  The DCC Pakcet Format
     See https://www.nmra.org/sites/default/files/s-92-2004-07.pdf
@@ -88,8 +88,8 @@ namespace dcc {
         DccSerializer<Writer> serializer;
         State state = State::WRITE_IDLE;
         
-        CommandMap scheduled;
-        CommandMap::Cursor cursor = scheduled.create_cursor();
+        CommandMap<16U> scheduled;
+        CommandMap<16U>::Cursor cursor = scheduled.create_cursor();
 
         void write_idle() {
             serializer.serialize(IDLE_CMD);
