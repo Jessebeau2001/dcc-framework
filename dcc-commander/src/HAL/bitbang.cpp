@@ -1,13 +1,21 @@
 #include "bitbang.hpp"
 
+#include <hal/chip.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/atomic.h>
 
 #include "common/bit_ring_buffer.hpp"
-#include "platform/avr.h"
 
 namespace bitbang::detail {
+    #if defined(ARDUINO_AVR_UNO)
+        using BangPin = HAL::GPIO_B::Pin<0>; // Uno pin 8
+    #elif defined(ARDUINO_AVR_MEGA2560)
+        using BangPin = HAL::GPIO_H::Pin<5>; // Mega pin 8
+    #else
+        #error "Unsuported/unconfigured board pinout"
+    #endif
+
 /*  In hardware CTC mode (WGM12), Timer1 counts from 0 up to N.
     That yields N + 1 timer clock cycles in a full period hence the -1.
 
@@ -81,7 +89,7 @@ using namespace detail;
 void begin() {
     cli();							// Disable global interrupts during setup
 
-    BangPin::configure(HAL::IOMode::Output);
+    HAL::io_configure<BangPin>(HAL::IOMode::Output);
 
     TCCR1A = 0;						// Reset Timer 1 Registers
     TCCR1B = 0;
