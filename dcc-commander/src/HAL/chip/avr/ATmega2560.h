@@ -1,6 +1,6 @@
 #pragma once
 #include <hal/core/sfr.hpp>
-#include <hal/core/register.hpp>
+#include <hal/io.hpp>
 
 // This one can be found on the Arduino Mega board
 // https://ww1.microchip.com/downloads/aemDocuments/documents/OTH/ProductDocuments/DataSheets/ATmega640-1280-1281-2560-2561-Datasheet-DS40002211A.pdf

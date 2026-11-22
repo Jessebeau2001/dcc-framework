@@ -1,6 +1,6 @@
 #pragma once
 #include <hal/core/sfr.hpp>
-#include <hal/core/register.hpp>
+#include <hal/io.hpp>
 
 // This one can be found on the Arduino UNO board
 // https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-7810-Automotive-Microcontrollers-ATmega328P_Datasheet.pdf
