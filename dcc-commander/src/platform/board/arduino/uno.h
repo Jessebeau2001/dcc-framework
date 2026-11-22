@@ -1,6 +1,6 @@
 #pragma once
 
-#include <hal/chip.h>
+#include "../../chip.h"
 
 namespace HAL {
     using LED_ONBOARD = GPIO_B::Pin<5>;

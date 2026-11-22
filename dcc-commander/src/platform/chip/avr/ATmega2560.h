@@ -1,11 +1,10 @@
 #pragma once
-#include <hal/core/sfr.hpp>
-#include <hal/io.hpp>
+#include "../../arch/avr/io.h"
 
 // This one can be found on the Arduino Mega board
 // https://ww1.microchip.com/downloads/aemDocuments/documents/OTH/ProductDocuments/DataSheets/ATmega640-1280-1281-2560-2561-Datasheet-DS40002211A.pdf
 
-namespace HAL {
+namespace platform::avr {
     using GPIO_A = GPIO<sfr_io8(0x00)>;
     using GPIO_B = GPIO<sfr_io8(0x03)>;
     using GPIO_C = GPIO<sfr_io8(0x06)>;

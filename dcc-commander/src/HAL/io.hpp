@@ -51,20 +51,6 @@ struct IOPort {
     using Pin = IOPin<IOPort, N>;
 };
 
-struct AvrIOPolicy : DefaultIOPolicy {
-    template <typename IO>
-    static constexpr void flip() {
-        IO::PIN::write(1);
-    }
-};
-
-template <uintptr_t Address>
-using GPIO = IOPort<
-    Register<Address,     u8>,
-    Register<Address + 1, u8>,
-    Register<Address + 2, u8>
->;
-
 enum class IOMode {
     Input,
     Output,

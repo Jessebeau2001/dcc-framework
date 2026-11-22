@@ -1,6 +1,6 @@
 #include "bitbang.hpp"
 
-#include <hal/chip.h>
+#include <platform/chip.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/atomic.h>
@@ -9,9 +9,9 @@
 
 namespace bitbang::detail {
     #if defined(ARDUINO_AVR_UNO)
-        using BangPin = HAL::GPIO_B::Pin<0>; // Uno pin 8
+        using BangPin = platform::avr::GPIO_B::Pin<0>; // Uno pin 8
     #elif defined(ARDUINO_AVR_MEGA2560)
-        using BangPin = HAL::GPIO_H::Pin<5>; // Mega pin 8
+        using BangPin = platform::avr::GPIO_H::Pin<5>; // Mega pin 8
     #else
         #error "Unsuported/unconfigured board pinout"
     #endif
