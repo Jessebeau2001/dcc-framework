@@ -13,6 +13,7 @@ namespace bitbang::detail {
     #elif defined(ARDUINO_AVR_MEGA2560)
         using BangPin = platform::avr::GPIO_H::Pin<5>; // Mega pin 8
         using TIM = platform::avr::Timer1;
+        using OC1A = platform::avr::GPIO_B::Pin<5>;
     #else
         #error "Unsuported/unconfigured board pinout"
     #endif
@@ -101,6 +102,9 @@ void begin() {
     BitHandle<TIM::TCCRB, WGM12>::set(); // Turn on CTC mode (Clear Timer on Compare Match)
     BitHandle<TIM::TCCRB, CS11 >::set(); // Set CS11 bit for Prescaler 8
 
+    HAL::io_configure<OC1A>(HAL::IOMode::Output); 
+    BitHandle<TIM::TCCRA, COM1A0>::set(); // Toggle pin OC1A (PB5 / Mega Pin 11) on compare match
+
     sei(); 							// Enable global interrupts
 }
 
@@ -139,28 +143,24 @@ void Writer::write_bit(bool bit) {
 
 ISR(TIMER1_COMPA_vect) {
     using namespace bitbang::detail;
+    // HAL::io_flip<bitbang::BangPin>();
 
     switch (tx_state) {
     case TxState::RISE:
-       HAL::io_flip<bitbang::BangPin>();
         timer_set_compare();
         tx_state = TxState::FALL;
         break;
 
     case TxState::FALL:
-        HAL::io_flip<bitbang::BangPin>();
-
         if (tx_buf.is_bit_available_for_read()) {
             current_bit = tx_buf.pop_bit();;
             tx_state = TxState::RISE;
         } else {
             tx_state = TxState::EXIT;
         }
-
         break;
 
     case TxState::EXIT:
-        HAL::io_flip<bitbang::BangPin>();
         timer_stop();
         break;
     }
