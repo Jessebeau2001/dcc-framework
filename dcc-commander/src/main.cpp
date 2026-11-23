@@ -1,5 +1,7 @@
 // #include <examples/port-scanner.h>
-#include <examples/scheduler-example.hpp>
+// #include <examples/scheduler-example.hpp>
+#include <examples/timer-example.hpp>
+
 
 /*
 a packet is 3 bytes + 2 preamble bytes + 4 seperators = 44 bits

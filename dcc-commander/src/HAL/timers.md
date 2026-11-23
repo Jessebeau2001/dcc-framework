@@ -236,6 +236,6 @@ __attribute__((used))               // Do not delete this function even though n
 __attribute__((signal))             // This is an interupt handler. Essentially means wrap in save/restore sreg block
 __attribute__((externally_visible)) // Do not optimize - keep a callable global symbol
 
-void __vector__15 (void) __attribute__((used, signal, externally_visible)); // Essentially forward declare and attach attributes
+void __vector_15 (void) __attribute__((used, signal, externally_visible)); // Essentially forward declare and attach attributes
 void __vector_15 (void) { /* your code */ } // Then conrete declaration with user code
 ```

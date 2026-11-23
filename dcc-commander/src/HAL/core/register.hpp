@@ -38,4 +38,27 @@ struct WriteonlyRegister : private Register<Address, T> {
     }
 };
 
+template <typename T>
+static constexpr T calc_shift(T m) {
+    T s = 0;
+    while (m != 0 && (m & 1) == 0) { m >>= 1; ++s; }
+    return s;
+}
+
+// Note is always RMW
+template<typename Reg, typename Reg::ValueType Mask>
+struct WriteLens {
+    using BaseType = typename Reg::ValueType;
+
+    static constexpr BaseType MASK = Mask;
+    static constexpr BaseType SHIFT = calc_shift(Mask);
+
+    static constexpr void write(BaseType value) {
+        BaseType current = Reg::read();
+        current &= ~MASK;
+        current |= (value << SHIFT) & MASK;
+        Reg::write(current);
+    }
+};
+
 } // namespace HAL

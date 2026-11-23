@@ -16,5 +16,7 @@ namespace platform::avr {
     using GPIO_J = GPIO<0x103>;
     using GPIO_K = GPIO<0x106>;
     using GPIO_L = GPIO<0x109>;
+
+    using Timer0 = Timer8<sfr_io8(0x24), sfr_io8(0x15), 0x6E>;
 } // namespace HAL
 

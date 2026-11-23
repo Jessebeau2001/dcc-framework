@@ -27,9 +27,9 @@ struct BitView {
 };
 
 
-template<typename Base, size_t Index>
+template<typename Reg, size_t Index>
 struct BitHandle {
-    using BaseType = typename Base::ValueType;
+    using BaseType = typename Reg::ValueType;
 
     static_assert(Index >= 0, "Bit index cannot be negative");
     static_assert(Index < (sizeof(BaseType) * 8), "Bit Index is out of range for type");
@@ -37,14 +37,14 @@ struct BitHandle {
     static constexpr BaseType MASK = static_cast<BaseType>(1) << Index;
 
     static constexpr bool read() {
-        return (Base::read() & MASK) != 0;
+        return (Reg::read() & MASK) != 0;
     }
 
     static constexpr void write(bool value) {
         if (value) {
-            Base::write(Base::read() | MASK);
+            Reg::write(Reg::read() | MASK);
         } else {
-            Base::write(Base::read() & ~MASK);
+            Reg::write(Reg::read() & ~MASK);
         }
     }
 };
