@@ -41,7 +41,6 @@ struct Timer8 {
 
 template<uintptr_t BaseAddr, uintptr_t TIMSKAddr, uintptr_t TIFRAddr>
 struct Timer16 {
-    using TIFR  = HAL::Register<TIFRAddr,      u8>;
     using TCCRA = HAL::Register<BaseAddr + 0,  u8>;
     using TCCRB = HAL::Register<BaseAddr + 1,  u8>;
     using TCCRC = HAL::Register<BaseAddr + 2,  u8>;
@@ -50,6 +49,9 @@ struct Timer16 {
     using ICR   = HAL::Register<BaseAddr + 6,  u16>;
     using OCRA  = HAL::Register<BaseAddr + 8,  u16>;
     using OCRB  = HAL::Register<BaseAddr + 10, u16>;
+    using OCRC  = HAL::Register<BaseAddr + 12, u16>;
+
+    using TIFR  = HAL::Register<TIFRAddr,      u8>;
     using TIMSK = HAL::Register<TIMSKAddr,     u8>;
 };
 
