@@ -12,6 +12,7 @@ namespace bitbang::detail {
         using BangPin = platform::avr::GPIO_B::Pin<0>; // Uno pin 8
     #elif defined(ARDUINO_AVR_MEGA2560)
         using BangPin = platform::avr::GPIO_H::Pin<5>; // Mega pin 8
+        using TIM = platform::avr::Timer1;
     #else
         #error "Unsuported/unconfigured board pinout"
     #endif
@@ -55,18 +56,18 @@ volatile TxState    tx_state        = TxState::RISE;
 volatile bool    	current_bit		= 0;
 
 inline void timer_set_compare() {
-    OCR1A = current_bit ? BIT_HIGH_TICKS : BIT_LOW_TICKS;
+    TIM::OCRA::write(current_bit ? BIT_HIGH_TICKS : BIT_LOW_TICKS);
 }
 
 inline bool timer_is_busy() {
-    return (TIMSK1 & (1 << OCIE1A)) != 0;
+    return BitHandle<TIM::TIMSK, OCIE1A>::is_set();
 }
 
 inline void timer_stop() {
-    TIMSK1 &= ~(1 << OCIE1A);
+    BitHandle<TIM::TIMSK, OCIE1A>::clear();
 }
 
-inline void kickstart_ISR() {
+void kickstart_ISR()  {
 	if (!timer_is_busy()) {
 		ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 			// Load first byte and reset state
@@ -74,9 +75,10 @@ inline void kickstart_ISR() {
             tx_state        = TxState::RISE;
             
             timer_set_compare();
-			TCNT1 = 0;               // Start cleanly from tick 0
-			TIFR1 = (1 << OCF1A);    // Clear stale interrupt flags
-			TIMSK1 |= (1 << OCIE1A); // Enable interrupt
+
+            TIM::TCNT::clear();                   // Start cleanly from tick 0
+            W1CHandle<TIM::TIFR, OCF1A>::clear(); // Clear stale interrupt flags
+            BitHandle<TIM::TIMSK, OCIE1A>::set(); // Enable interrupt
 		}
 	}
 }
@@ -89,14 +91,15 @@ using namespace detail;
 void begin() {
     cli();							// Disable global interrupts during setup
 
-    HAL::io_configure<BangPin>(HAL::IOMode::Output);
+    HAL::io_configure<BangPin>(HAL::IOMode::Output);    
+    
+    TIM::TCCRA::clear();            // Reset Timer 1 Registers
+    TIM::TCCRB::clear();
+    TIM::TCCRC::clear();
+    TIM::TCNT ::clear();
 
-    TCCR1A = 0;						// Reset Timer 1 Registers
-    TCCR1B = 0;
-    TCNT1  = 0;
-
-    TCCR1B |= (1 << WGM12); 		// Turn on CTC mode (Clear Timer on Compare Match.)
-    TCCR1B |= (1 << CS11); 			// Set CS11 bit for Prescaler 8
+    BitHandle<TIM::TCCRB, WGM12>::set(); // Turn on CTC mode (Clear Timer on Compare Match)
+    BitHandle<TIM::TCCRB, CS11 >::set(); // Set CS11 bit for Prescaler 8
 
     sei(); 							// Enable global interrupts
 }

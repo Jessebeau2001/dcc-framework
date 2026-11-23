@@ -16,6 +16,14 @@ struct Register {
     static inline void write(T value) {
         *reinterpret_cast<volatile T*>(Address) = value;
     }
+
+    static inline void clear() {
+        write(0U);
+    }
+
+    static inline void set(T bits) {
+        write(read() | bits);
+    }
 };
 
 template <uintptr_t Address, typename T>

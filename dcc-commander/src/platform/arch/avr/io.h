@@ -39,7 +39,7 @@ struct Timer8 {
     using TIMSK = HAL::Register<TIMSKAddr,    u8>;
 };
 
-template<uintptr_t BaseAddr, uintptr_t TIMSKAddr, uintptr_t TIFRAddr>
+template<uintptr_t BaseAddr, uintptr_t TIFRAddr, uintptr_t TIMSKAddr>
 struct Timer16 {
     using TCCRA = HAL::Register<BaseAddr + 0,  u8>;
     using TCCRB = HAL::Register<BaseAddr + 1,  u8>;
