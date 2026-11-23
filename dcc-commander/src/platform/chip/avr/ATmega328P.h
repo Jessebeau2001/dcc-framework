@@ -10,4 +10,7 @@ namespace platform::avr {
     using GPIO_D = GPIO<sfr_io8(0x09)>;
 
     using Timer0 = Timer8<sfr_io8(0x24), sfr_io8(0x15), 0x6E>;
+    using Timer1 = Timer16<       0x80 , sfr_io8(0x16), 0x6F>;
+    using Timer2 = Timer8<        0xB0 , sfr_io8(0x17), 0x70>;
+    
 } // namespace HAL
