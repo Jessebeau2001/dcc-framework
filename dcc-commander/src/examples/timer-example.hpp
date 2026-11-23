@@ -1,36 +1,130 @@
 #pragma once
 
-#include <hal/timer.hpp>
-#include <platform/arch/avr/io.h>
+#include <platform/chip.h>
+#include <common/handle.h>
+#include <dcc/dcc-banger.hpp>
+#include <dcc/dcc.hpp>
 #include <Arduino.h>
 
-using platform::avr::sfr_io8;
+using platform::avr::Timer1;
 
-using TCCR0A_ = HAL::Register<sfr_io8(0x24), u8>;
-using TCCR0B_ = HAL::Register<sfr_io8(0x25), u8>;
-using TCNT0_  = HAL::Register<sfr_io8(0x26), u8>;
-using OCR0A_  = HAL::Register<sfr_io8(0x27), u8>;
-using OCR0B_  = HAL::Register<sfr_io8(0x28), u8>;
+template <typename Pin>
+struct Timer1Handle {
+    static inline void configure() {
+        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        HAL::io_configure<Pin>(HAL::IOMode::Output);
+        
+        // Reset Timer 1 Registers
+        Timer1::TCCRA::clear();
+        Timer1::TCCRB::clear();
+        Timer1::TCCRC::clear();
+        Timer1::TCNT ::clear();
 
-using TIFR0_  = HAL::Register<sfr_io8(0x15), u8>;
-using TIMSK0_ = HAL::Register<0x6E, u8>;
+        // Turn on CTC mode (Clear Timer on Compare Match)
+        BitHandle<Timer1::TCCRB, WGM12>::set();
+        // Set CS11 bit for Prescaler 8
+        BitHandle<Timer1::TCCRB, CS11 >::set();
+        }
+    }
 
-using TCCR0_ = HAL::AvrTCCR<
-    TCCR0A_,
-    TCCR0B_,
-    HAL::Timer0Policy>;
+    static inline void flip_pin() {
+        HAL::io_flip<Pin>();
+    }
 
-using Timer0  = HAL::Timer<
-    TCCR0_,
-    TCNT0_,
-    OCR0A_, OCR0B_,
-    TIMSK0_, TIFR0_>;
+    static inline void set_compare(unsigned short ticks) {
+        Timer1::OCRA::write(ticks);
+    }
+
+    static inline bool is_routine_active() {
+        return BitHandle<Timer1::TIMSK, OCIE1A>::is_set();
+    }
+
+    static inline void arm_timer() {
+        Timer1::TCNT::clear();                   // Start cleanly from tick 0
+        W1CHandle<Timer1::TIFR, OCF1A>::clear(); // Clear stale interrupt flags
+        BitHandle<Timer1::TIMSK, OCIE1A>::set(); // Enable interrupt
+    }
+ 
+    static inline void disable_interupt() {
+        // Clear Timer Mask OCRA flag
+        BitHandle<Timer1::TIMSK, OCIE1A>::clear();
+    }
+};
+
+using dcc::DccSerializer;
+using dcc::Command;
+using dcc::Instruction;
+using dcc::SpeedStep;
+using dcc::Direction;
+using dcc::DccScheduler;
+
+using BBWriter = dcc::Bitbanger<
+    Timer1Handle<platform::avr::GPIO_H::Pin<5>>,
+    dcc::DefaultTimings
+>;
+
+auto bbwriter = BBWriter{};
+auto scheduler = DccScheduler<BBWriter>{bbwriter};
+
+// =====================
+
+uint32_t previous_time = 0; 
+uint16_t delay_ms = 1000;
+
+u8 num_actions = 0;
+u8 rest = 0;
+bool reverse = 0;
+
+Command cmd = {
+	.address = 0,
+	.instruction = Instruction{
+		SpeedStep::Step6,
+		Direction::FORWARD,
+		0b01
+	}
+};
+
+void update_scheduling() {
+	if (rest > 0) {
+		Serial.print("Resting for ");
+		Serial.println(rest);
+
+		rest--;
+		return;
+	}
+
+	u8 addr = 55 + (10 * num_actions);
+
+	if (reverse == 0) {
+		cmd.address = addr;
+		scheduler.schedule(cmd);
+	} else {
+		scheduler.remove(addr);
+	}
+	
+	num_actions += 1;
+	if (num_actions > 4) {
+		num_actions = 0;
+		reverse = !reverse;
+		rest = 8;
+	}
+}
 
 void setup() {
-    Timer0::wgm_set(Timer0::WGM::CTC);
-    Timer0::OCRA::write(55);
+    Serial.begin(9600);
+    bbwriter.configure();
+    sei();
 }
 
 void loop() {
-    
+    uint32_t current_time = millis();
+
+	if (current_time - previous_time >= delay_ms) {
+		previous_time = current_time;
+		update_scheduling();
+	}
+
+	scheduler.update();
 }
+
+ISR(TIMER1_COMPA_vect) { bbwriter.routine(); }

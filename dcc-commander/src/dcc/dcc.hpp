@@ -25,21 +25,22 @@ namespace dcc {
     class DccSerializer {
     private:
         u8 checksum = 0;
+        Writer& writer;
 
     public:
-        DccSerializer() { }
+        DccSerializer(Writer& writer) : writer(writer) { }
 
         void frame_open() {
             checksum = 0;
 
-            Writer::write_byte(0xFF); // Write the preamble
-            Writer::write_byte(0xFF); // We choose 16 preamble bits instead of 11
-            Writer::write_bit(0);
+            writer.write_byte(0xFF); // Write the preamble
+            writer.write_byte(0xFF); // We choose 16 preamble bits instead of 11
+            writer.write_bit(0);
         }
 
         void write_byte(uint8_t byte) {
-            Writer::write_byte(byte);
-            Writer::write_bit(0);
+            writer.write_byte(byte);
+            writer.write_bit(0);
 
             checksum ^= byte; // Checksum is exclusive or of every byte send
         }
@@ -57,8 +58,8 @@ namespace dcc {
         }
 
         void frame_close() {
-            Writer::write_byte(checksum);
-            Writer::write_bit(1);
+            writer.write_byte(checksum);
+            writer.write_bit(1);
         }
 
         void serialize(const Command &command) {
@@ -68,6 +69,11 @@ namespace dcc {
             write_byte(static_cast<u8>(command.instruction));
 
             frame_close();
+        }
+
+        // Kinda weird to expose this here but the scheduler needs to know about it
+        size_t available() {
+            return writer.available();
         }
     };
 
@@ -87,7 +93,8 @@ namespace dcc {
 
         static constexpr u8 WRITER_SPACE_REQUIRED = 8 * DCC_MAX_PACKET_SIZE; // Keep 8 packets of size available
 
-        DccSerializer<Writer> serializer;
+        Writer& writer;
+        DccSerializer<Writer> serializer{writer};
         State state = State::WRITE_IDLE;
         
         CommandMap<16U> scheduled;
@@ -108,8 +115,10 @@ namespace dcc {
         }
     
     public:
+        DccScheduler(Writer& writer) : writer(writer) { }
+
         void update() {
-            if (!(Writer::available() > WRITER_SPACE_REQUIRED))
+            if (!(serializer.available() > WRITER_SPACE_REQUIRED))
                 return;
 
             switch (state) {
@@ -143,7 +152,7 @@ namespace dcc {
     template <typename Writer>
     class DccController {
     private:
-        DccScheduler<Writer> scheduler;
+        // DccScheduler<Writer> scheduler;
     
     public:
         void update() {
