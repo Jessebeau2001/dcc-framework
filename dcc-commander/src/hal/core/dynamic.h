@@ -13,7 +13,7 @@ struct DynamicPin {
 };
 
 template <typename T>
-struct DataView {
+struct DynamicData {
     using ValueType = T;
 
     T const* addr;

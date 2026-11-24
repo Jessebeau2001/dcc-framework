@@ -1,8 +1,7 @@
 #pragma once
 
 #include <types.h>
-#include <common/handle.h>
-#include <common/container.h>
+#include <hal/core/dynamic.h>
 
 using namespace types;
 
@@ -57,7 +56,7 @@ public:
 
 
 // This system is kinda purpose build for 8 bit wide registers so might aswell hard lock the type here
-using SensorHandle = HAL::DataView<u8>;
+using SensorHandle = HAL::DynamicData<u8>;
 
 struct StationConfig {
     SensorHandle sensor_left;
