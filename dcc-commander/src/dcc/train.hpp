@@ -1,29 +1,64 @@
 #pragma once
 
 #include <dcc/types.h>
+#include <dcc/station.hpp>
 
-namespace dcc {
+namespace train {
     enum class DriveState : u8 {
         Docked,
-        Driving,
-        Lost
+        DrivingForward,
+        DrivingBackward
+    };
+
+    enum class RelativeDirection {
+        Left,
+        Center,
+        Right
     };
 
     struct TrainState {
-        DriveState state;
-        Direction direction;
-        u8 current_station;
-        u8 target_station;
+        // Extrapolated from the sensors
+        u8                current_station_id;
+        RelativeDirection current_station_rel;
+
+        // Set as detirmened by controller
+        DriveState drive_state;
+        u8         target_station;
     };
 
+
+    template <u8 Size>
     class TrackScanner {
+        const Station* stations[Size];
+
     public:
-        void update() {
-
+        constexpr TrackScanner(const Station *const (&init)[Size]) : stations{} {
+            for (u8 i = 0; i < Size; ++i) {
+                stations[i] = init[i];
+            }
         }
-        
-        void derive_state(TrainState& train) {
 
+        void write_train(TrainState& train) const {
+            for (u8 i = 0; i < Size; i++) {
+                const Station& current_station = *stations[i];
+                auto occupancy = station_check_occupancy(current_station);
+
+                switch (occupancy) {
+                case StationOcupancy::EMPTY:
+                    continue;
+                case StationOcupancy::LEFT:
+                    train.current_station_rel = RelativeDirection::Left;
+                    break;
+                case StationOcupancy::OCCUPIED:
+                    train.current_station_rel = RelativeDirection::Center;
+                    break;
+                case StationOcupancy::RIGHT:
+                    train.current_station_rel = RelativeDirection::Right;
+                    break;
+                }
+
+                train.current_station_id = current_station.id;
+            }
         }
     };
 }

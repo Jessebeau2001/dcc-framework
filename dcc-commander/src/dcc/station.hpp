@@ -1,13 +1,15 @@
 #pragma once
 
 #include <types.h>
+#include <stddef.h>
 #include <hal/core/dynamic.h>
+#include <common/handle.h>
 
 using namespace types;
 
 namespace train {
 
-enum class Direction : u8 {
+enum class SearchDirection : u8 {
     FORWARD   =  0,
     BACKWARD  =  1,
     CURRENT   =  2,
@@ -35,21 +37,21 @@ public:
         return -1;
     }
 
-    Direction search(T from, T to) const {
+    SearchDirection search(T from, T to) const {
         auto from_idx = index_of(from);
         if (from_idx < 0)
-            return Direction::NOT_FOUND;
+            return SearchDirection::NOT_FOUND;
 
         auto to_idx = index_of(to);
         if (to_idx < 0)
-            return Direction::NOT_FOUND;
+            return SearchDirection::NOT_FOUND;
 
         if (from_idx == to_idx) {
-            return Direction::CURRENT;
+            return SearchDirection::CURRENT;
         } else if (from_idx < to_idx) {
-            return Direction::FORWARD;
+            return SearchDirection::FORWARD;
         } else {
-            return Direction::BACKWARD;
+            return SearchDirection::BACKWARD;
         }
     }
 };
@@ -71,23 +73,26 @@ struct Station {
 
 template <typename RegLeft, typename RegCenter, typename RegRight>
 struct StationPortDebouncer {
-    using ScanLeft              = PortScanner<RegLeft>;
-    using ScanCenter            = PortScanner<RegCenter>;
-    using ScanRight             = PortScanner<RegRight>;
+    using ScanLeft              = PortDebouncer<RegLeft>;
+    using ScanCenter            = PortDebouncer<RegCenter>;
+    using ScanRight             = PortDebouncer<RegRight>;
 
-    using LeftState             = typename ScanLeft::State;
-    using CenterState           = typename ScanCenter::State;
-    using RightState            = typename ScanRight::State;
-
-    LeftState   state_left      = LeftState();
-    CenterState state_center    = CenterState();
-    RightState  state_right     = RightState();
+    DebounceState<u8> state_left      = DebounceState<u8>{};
+    DebounceState<u8> state_center    = DebounceState<u8>{};
+    DebounceState<u8> state_right     = DebounceState<u8>{};
 
     inline void update() {
         ScanLeft::update(state_left);
         ScanCenter::update(state_center);
         ScanRight::update(state_right);
     }
+};
+
+template <size_t SharedIndex, typename RegLeft, typename RegCenter, typename RegRight>
+struct TripletView {
+    using PinLeft   = View<RegLeft, SharedIndex>;
+    using PinCenter = View<RegCenter, SharedIndex>;
+    using PinRight  = View<RegRight, SharedIndex>;
 };
 
 enum StationOcupancy {
@@ -135,8 +140,20 @@ public:
     };
 };
 
+template <typename StationSensor>
+StationOcupancy static_station_scan() {
+    if (StationSensor::PinLeft::is_set() != 0) {
+        return StationOcupancy::LEFT;
+    } else if (StationSensor::PinCenter::is_set() != 0) {
+        return StationOcupancy::OCCUPIED;
+    } else if (StationSensor::PinRight::is_set() != 0) {
+        return StationOcupancy::RIGHT;
+    } else {
+        return StationOcupancy::EMPTY;
+    }
+}
 
-StationOcupancy check_station_occupancy(const Station& station) {
+StationOcupancy station_check_occupancy(const Station& station) {
     if (HAL::read_bit(station.config.sensor_left) != 0) {
         return StationOcupancy::LEFT;
     } else if (HAL::read_bit(station.config.sensor_center) != 0) {

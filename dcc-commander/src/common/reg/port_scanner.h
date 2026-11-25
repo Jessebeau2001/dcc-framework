@@ -5,16 +5,24 @@
 
 using namespace types;
 
-template <typename Reg>
-struct PortScanner {
-    using ValueType = typename Reg::ValueType;
-    
-    // State values are dependant on register width
-    struct State {
-        ValueType value;
-        ValueType cnt0;
-        ValueType cnt1;
+// State values are dependant on register width
+template <typename V>
+struct DebounceState {
+    V value, cnt0, cnt1;
+
+    template <DebounceState& S>
+    struct Binding {
+        using ValueType = V;
+
+        static constexpr ValueType read() {
+            return S.value;
+        }
     };
+};
+
+template <typename Reg>
+struct PortDebouncer {
+    using ValueType = typename Reg::ValueType;
     
     /* This uses a parallel vertical counter algorithm to debounce - Example:
         delta = reading ^ debounced             | 1 ^ 0 = 1         (disagreement detected)
@@ -24,7 +32,7 @@ struct PortScanner {
         debounced ^= stable_mask;               | 0 ^= 0 = 0        (stable state remains unchanged on tick 1
     */
 
-    static inline void update(State& s) {
+    static inline void update(DebounceState<ValueType>& s) {
         u8 delta = Reg::read() ^ s.value;               // XOR delta of known good and new data
 
         s.cnt0 = ~s.cnt0 & delta;                       // Count up 1 in counters for every delta bit

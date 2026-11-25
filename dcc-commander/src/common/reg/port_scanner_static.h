@@ -7,7 +7,7 @@
 // but on the other hands restricts us from mmanaging the lifetime of the state
 
 template <typename Reg>
-struct PortScanner {
+struct PortDebouncer {
     static inline u8 value = 0;
 
 private:
