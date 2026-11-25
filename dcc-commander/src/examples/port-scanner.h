@@ -32,14 +32,21 @@ using BindingLeft    = DebounceState8::Binding<state_left>;
 using BindingCenter  = DebounceState8::Binding<state_center>;
 using BindingRight   = DebounceState8::Binding<state_right>;
 
-using Station0 = train::TripletView<0, BindingLeft, BindingCenter, BindingRight>;
-using Station1 = train::TripletView<1, BindingLeft, BindingCenter, BindingRight>;
-using Station2 = train::TripletView<2, BindingLeft, BindingCenter, BindingRight>;
-using Station3 = train::TripletView<3, BindingLeft, BindingCenter, BindingRight>;
-using Station4 = train::TripletView<4, BindingLeft, BindingCenter, BindingRight>;
-using Station5 = train::TripletView<5, BindingLeft, BindingCenter, BindingRight>;
-using Station6 = train::TripletView<6, BindingLeft, BindingCenter, BindingRight>;
-using Station7 = train::TripletView<7, BindingLeft, BindingCenter, BindingRight>;
+// Simple helper that auto binds shared ID for sensor and pin index to regs
+template <u8 Id>
+using SimpleStation = train::StaticStation<Id, train::TripletView<Id, BindingLeft, BindingCenter, BindingRight>>;
+
+using Station0 = SimpleStation<0>;
+using Station1 = SimpleStation<1>;
+using Station2 = SimpleStation<2>;
+using Station3 = SimpleStation<3>;
+using Station4 = SimpleStation<4>;
+using Station5 = SimpleStation<5>;
+using Station6 = SimpleStation<6>;
+using Station7 = SimpleStation<7>;
+
+using Track1 = train::Track<Station0, Station1, Station2, Station3>;
+
 
 auto station_pool = train::StationPool();
 
@@ -77,11 +84,7 @@ void setup() {
 auto clock = util::Clock<1000>{};
 
 void loop() {
-    // station_debouncer.update();
-    // track_1.write_train(train_1);
-    if (train::static_station_scan<Station0>() == train::StationOcupancy::LEFT) {
-
-    }
+    Track1::resolve_train_position(train_1);
 
     if (clock.update(millis())) {
         Serial.write("Hello Arie");

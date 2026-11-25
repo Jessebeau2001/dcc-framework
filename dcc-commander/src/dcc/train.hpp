@@ -61,4 +61,32 @@ namespace train {
             }
         }
     };
+
+    template<typename StationType>
+    static constexpr void resolve_position(TrainState& train) {
+        auto occupancy = station_static_scan<typename StationType::Sensors>();
+
+        switch (occupancy) {
+        case StationOcupancy::EMPTY:
+            return;
+        case StationOcupancy::LEFT:
+            train.current_station_rel = RelativeDirection::Left;
+            break;
+        case StationOcupancy::OCCUPIED:
+            train.current_station_rel = RelativeDirection::Center;
+            break;
+        case StationOcupancy::RIGHT:
+            train.current_station_rel = RelativeDirection::Right;
+            break;
+        }
+
+        train.current_station_id = StationType::ID;
+    }
+
+    template<typename... Stations>
+    struct Track {
+        static constexpr void resolve_train_position(TrainState& out) {
+            (train::resolve_position<Stations>(out), ...);
+        }
+    };
 }

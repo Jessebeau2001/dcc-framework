@@ -16,6 +16,28 @@ enum class SearchDirection : u8 {
     NOT_FOUND =  3
 };
 
+// This system is kinda purpose build for 8 bit wide registers so might aswell hard lock the type here
+using SensorHandle = HAL::DynamicData<u8>;
+
+struct StationConfig {
+    SensorHandle sensor_left;
+    SensorHandle sensor_center;
+    SensorHandle sensor_right;
+};
+
+struct Station {
+    StationConfig config;
+    u8 id;
+};
+
+enum StationOcupancy {
+    EMPTY,
+    LEFT,
+    OCCUPIED,
+    RIGHT
+};
+
+
 template <typename T, u8 Size>
 class LinearStationMap {
     static constexpr u8 SIZE = Size;
@@ -56,21 +78,6 @@ public:
     }
 };
 
-
-// This system is kinda purpose build for 8 bit wide registers so might aswell hard lock the type here
-using SensorHandle = HAL::DynamicData<u8>;
-
-struct StationConfig {
-    SensorHandle sensor_left;
-    SensorHandle sensor_center;
-    SensorHandle sensor_right;
-};
-
-struct Station {
-    StationConfig config;
-    u8 id;
-};
-
 template <typename RegLeft, typename RegCenter, typename RegRight>
 struct StationPortDebouncer {
     using ScanLeft              = PortDebouncer<RegLeft>;
@@ -95,12 +102,24 @@ struct TripletView {
     using PinRight  = View<RegRight, SharedIndex>;
 };
 
-enum StationOcupancy {
-    EMPTY,
-    LEFT,
-    OCCUPIED,
-    RIGHT
+template <u8 Id, typename Sensors_>
+struct StaticStation {
+    static constexpr u8 ID = Id;
+    using Sensors = Sensors_;
 };
+
+template <typename StationSensor>
+StationOcupancy station_static_scan() {
+    if (StationSensor::PinLeft::is_set() != 0) {
+        return StationOcupancy::LEFT;
+    } else if (StationSensor::PinCenter::is_set() != 0) {
+        return StationOcupancy::OCCUPIED;
+    } else if (StationSensor::PinRight::is_set() != 0) {
+        return StationOcupancy::RIGHT;
+    } else {
+        return StationOcupancy::EMPTY;
+    }
+}
 
 void set_config_handle(SensorHandle& handle, u8 const* value_ptr, u8 i) {
     handle.addr = value_ptr;
@@ -139,19 +158,6 @@ public:
         return &stations[index];
     };
 };
-
-template <typename StationSensor>
-StationOcupancy static_station_scan() {
-    if (StationSensor::PinLeft::is_set() != 0) {
-        return StationOcupancy::LEFT;
-    } else if (StationSensor::PinCenter::is_set() != 0) {
-        return StationOcupancy::OCCUPIED;
-    } else if (StationSensor::PinRight::is_set() != 0) {
-        return StationOcupancy::RIGHT;
-    } else {
-        return StationOcupancy::EMPTY;
-    }
-}
 
 StationOcupancy station_check_occupancy(const Station& station) {
     if (HAL::read_bit(station.config.sensor_left) != 0) {
