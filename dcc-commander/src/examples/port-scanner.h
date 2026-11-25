@@ -3,14 +3,18 @@
 #include <common/reg/port_scanner.h>
 #include <hal/core/dynamic.h>
 #include <dcc/station.hpp>
-#include <hal/board.h>
+#include <platform/board.h>
 
 #include <Arduino.h>
 
+using IO_A = platform::avr::GPIO_B;
+using IO_B = platform::avr::GPIO_C;
+using IO_C = platform::avr::GPIO_D;
+
 auto station_debouncer = train::StationPortDebouncer<
-    HAL::GPIO_B::PIN,
-    HAL::GPIO_C::PIN,
-    HAL::GPIO_D::PIN>();
+    IO_A::PIN,
+    IO_B::PIN,
+    IO_C::PIN>();
 auto station_pool = train::StationPool();
 
 const auto station_0 = station_pool.create_station(station_debouncer, 0);
@@ -34,17 +38,17 @@ const auto station_map = train::LinearStationMap({
 });
 
 void setup() {
-    HAL::io_configure<HAL::GPIO_B>(HAL::IOMode::Input);
-    HAL::io_configure<HAL::GPIO_C>(HAL::IOMode::Input);
-    HAL::io_configure<HAL::GPIO_D>(HAL::IOMode::Input);
-    HAL::io_configure<HAL::LED_ONBOARD>(HAL::IOMode::Output);
+    HAL::io_configure<IO_A>(HAL::IOMode::Input);
+    HAL::io_configure<IO_B>(HAL::IOMode::Input);
+    HAL::io_configure<IO_C>(HAL::IOMode::Input);
+    HAL::io_configure<platform::avr::LED_ONBOARD>(HAL::IOMode::Output);
 }
 
 void loop() {
     station_debouncer.update();
-    if (train::check_occupancy(*station_1) == train::StationOcupancy::OCCUPIED) {
-        HAL::io_write<HAL::LED_ONBOARD>(1);
+    if (train::check_station_occupancy(*station_1) == train::StationOcupancy::OCCUPIED) {
+        HAL::io_write<platform::avr::LED_ONBOARD>(1);
     } else {
-        HAL::io_write<HAL::LED_ONBOARD>(0);
+        HAL::io_write<platform::avr::LED_ONBOARD>(0);
     }
 }

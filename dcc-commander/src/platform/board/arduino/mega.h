@@ -2,6 +2,6 @@
 
 #include "../../chip.h"
 
-namespace HAL {
+namespace platform::avr {
     using LED_ONBOARD = GPIO_B::Pin<7>;
 } // namespace HAL

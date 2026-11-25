@@ -44,7 +44,7 @@ namespace dcc {
     };
 
     
-    enum class Direction : uint8_t {
+    enum class Direction : u8 {
         BACKWARD = 0,
         FORWARD  = 1
     };

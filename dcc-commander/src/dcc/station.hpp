@@ -136,7 +136,7 @@ public:
 };
 
 
-StationOcupancy check_occupancy(const Station& station) {
+StationOcupancy check_station_occupancy(const Station& station) {
     if (HAL::read_bit(station.config.sensor_left) != 0) {
         return StationOcupancy::LEFT;
     } else if (HAL::read_bit(station.config.sensor_center) != 0) {
