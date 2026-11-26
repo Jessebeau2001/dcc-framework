@@ -9,30 +9,30 @@
 
 #include <Arduino.h>
 
-using IO_A = platform::avr::GPIO_B;
-using IO_B = platform::avr::GPIO_C;
-using IO_C = platform::avr::GPIO_D;
+using IO_Left = platform::avr::GPIO_B;
+using IO_Center = platform::avr::GPIO_C;
+using IO_Right = platform::avr::GPIO_D;
 
 auto station_debouncer = train::StationPortDebouncer<
-    IO_A::PIN,
-    IO_B::PIN,
-    IO_C::PIN>();
+    IO_Left::PIN,
+    IO_Center::PIN,
+    IO_Right::PIN>();
 
-using DebounceLeft   = PortDebouncer<IO_A::PIN>;
-using DebounceCenter = PortDebouncer<IO_B::PIN>;
-using DebounceRight  = PortDebouncer<IO_C::PIN>;
+using DebouncerLeft   = PortDebouncer<IO_Left::PIN>;
+using DebouncerCenter = PortDebouncer<IO_Center::PIN>;
+using DebouncerRight  = PortDebouncer<IO_Right::PIN>;
 
 using DebounceState8 = DebounceState<u8>;
 
-auto state_left      = DebounceState8{};
-auto state_center    = DebounceState8{};
-auto state_right     = DebounceState8{};
+auto debounce_state_left      = DebounceState8{};
+auto debounce_state_center    = DebounceState8{};
+auto debounce_state_right     = DebounceState8{};
 
-using BindingLeft    = DebounceState8::Binding<state_left>;
-using BindingCenter  = DebounceState8::Binding<state_center>;
-using BindingRight   = DebounceState8::Binding<state_right>;
+using BindingLeft    = DebounceState8::Binding<debounce_state_left>;
+using BindingCenter  = DebounceState8::Binding<debounce_state_center>;
+using BindingRight   = DebounceState8::Binding<debounce_state_right>;
 
-// Simple helper that auto binds shared ID for sensor and pin index to regs
+// Simple helper that auto binds shared ID for sensor and pin index to virtual regs
 template <u8 Id>
 using SimpleStation = train::StaticStation<Id, train::TripletView<Id, BindingLeft, BindingCenter, BindingRight>>;
 
@@ -46,47 +46,32 @@ using Station6 = SimpleStation<6>;
 using Station7 = SimpleStation<7>;
 
 using Track1 = train::Track<Station0, Station1, Station2, Station3>;
+using Track2 = train::Track<Station4, Station5, Station6, Station7>;
 
-
-auto station_pool = train::StationPool();
-
-const auto station_0 = station_pool.create_station(station_debouncer, 0);
-const auto station_1 = station_pool.create_station(station_debouncer, 1);
-const auto station_2 = station_pool.create_station(station_debouncer, 2);
-const auto station_3 = station_pool.create_station(station_debouncer, 3);
-const auto station_4 = station_pool.create_station(station_debouncer, 4);
-const auto station_5 = station_pool.create_station(station_debouncer, 5);
-const auto station_6 = station_pool.create_station(station_debouncer, 6);
-const auto station_7 = station_pool.create_station(station_debouncer, 7);
-
-const auto station_map = train::LinearStationMap({
-    station_0->id,
-    station_1->id,
-    station_2->id,
-    station_3->id,
-    station_4->id,
-    station_5->id,
-    station_6->id,
-    station_7->id
-});
-
-const auto track_1 = train::TrackScanner({ station_0, station_1, station_2, station_3 });
 train::TrainState train_1 = train::TrainState{};
+train::TrainState train_2 = train::TrainState{};
 
 void setup() {
     Serial.begin(115200);
-    HAL::io_configure<IO_A>(HAL::IOMode::Input);
-    HAL::io_configure<IO_B>(HAL::IOMode::Input);
-    HAL::io_configure<IO_C>(HAL::IOMode::Input);
-    HAL::io_configure<platform::avr::LED_ONBOARD>(HAL::IOMode::Output);
+
+    HAL::io_configure<IO_Left  >(HAL::IOMode::Input);
+    HAL::io_configure<IO_Center>(HAL::IOMode::Input);
+    HAL::io_configure<IO_Right >(HAL::IOMode::Input);
 }
 
 auto clock = util::Clock<1000>{};
 
 void loop() {
+    // First bulk debounce all 3x8 input pins
+    DebouncerLeft  ::update(debounce_state_left);
+    DebouncerCenter::update(debounce_state_center);
+    DebouncerRight ::update(debounce_state_right);
+
+    // Extrapolate train state from debounced sensor data and write to train
     Track1::resolve_train_position(train_1);
+    Track2::resolve_train_position(train_2);
 
     if (clock.update(millis())) {
-        Serial.write("Hello Arie");
+        // Todo show some debug output
     }
 }
